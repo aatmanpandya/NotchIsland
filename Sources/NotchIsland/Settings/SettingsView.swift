@@ -208,9 +208,12 @@ private struct AccessibilityRow: View {
             HStack {
                 Text("Accessibility permission")
                 Spacer()
-                if MediaKeyTap.isTrusted {
-                    Label("Allowed", systemImage: "checkmark.circle.fill")
+                if MediaKeyTap.isActive {
+                    Label("Active", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                } else if MediaKeyTap.isTrusted {
+                    Label("Allowed, starting…", systemImage: "clock")
+                        .foregroundStyle(.secondary)
                 } else {
                     Button("Open Accessibility Settings") {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {

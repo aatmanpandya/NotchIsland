@@ -216,12 +216,13 @@ final class NotchController {
         }
         if mediaKeys.start() { return }
         guard trustCheck == nil else { return }
-        MediaKeyTap.requestTrust()
-        trustCheck = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
-            guard let self, MediaKeyTap.isTrusted else { return }
+        DiagnosticsLog.write("Key takeover waiting. Accessibility allowed: \(MediaKeyTap.isTrusted).")
+        if !MediaKeyTap.isTrusted { MediaKeyTap.requestTrust() }
+        // Keep trying: permission can take effect a moment after it's granted.
+        trustCheck = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            guard let self, mediaKeys.start() else { return }
             timer.invalidate()
             trustCheck = nil
-            mediaKeys.start()
         }
     }
 

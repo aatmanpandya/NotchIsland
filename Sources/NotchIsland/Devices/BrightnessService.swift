@@ -71,6 +71,8 @@ final class MediaKeyTap {
     private var runLoopSource: CFRunLoopSource?
 
     var isRunning: Bool { tap != nil }
+    /// For the status row in Settings.
+    private(set) static var isActive = false
     static var isTrusted: Bool { AXIsProcessTrusted() }
 
     /// Shows macOS's own prompt to allow Accessibility in System Settings.
@@ -79,19 +81,38 @@ final class MediaKeyTap {
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
+    /// Tries to take over the keys; safe to call repeatedly. Returns whether it's running.
     @discardableResult
     func start() -> Bool {
-        guard tap == nil, Self.isTrusted else { return isRunning }
+        guard tap == nil else { return true }
         // Media keys arrive as "system defined" events. Some Apple keyboards send brightness as
         // ordinary key presses instead (key codes 144 and 145), so watch those too; every other
-        // key passes straight through.
-        let systemDefined = CGEventMask(1 << 14) // NSEvent.EventType.systemDefined
+        // key passes straight through. If macOS won't allow watching key presses, settle for
+        // media keys alone.
+        let mediaKeys = CGEventMask(1 << 14) // NSEvent.EventType.systemDefined
+        let withKeyPresses = mediaKeys
             | CGEventMask(1 << CGEventType.keyDown.rawValue)
             | CGEventMask(1 << CGEventType.keyUp.rawValue)
+        for (mask, name) in [(withKeyPresses, "media keys and key presses"), (mediaKeys, "media keys only")] {
+            if let tap = makeTap(mask) {
+                let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
+                CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+                CGEvent.tapEnable(tap: tap, enable: true)
+                self.tap = tap
+                runLoopSource = source
+                Self.isActive = true
+                DiagnosticsLog.write("Key takeover on (\(name)).")
+                return true
+            }
+        }
+        return false
+    }
+
+    private func makeTap(_ mask: CGEventMask) -> CFMachPort? {
         let context = Unmanaged.passUnretained(self).toOpaque()
-        guard let tap = CGEvent.tapCreate(
+        return CGEvent.tapCreate(
             tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
-            eventsOfInterest: systemDefined,
+            eventsOfInterest: mask,
             callback: { _, type, event, context in
                 guard let context else { return Unmanaged.passUnretained(event) }
                 let keyTap = Unmanaged<MediaKeyTap>.fromOpaque(context).takeUnretainedValue()
@@ -102,18 +123,7 @@ final class MediaKeyTap {
                 return keyTap.handle(event) ? nil : Unmanaged.passUnretained(event)
             },
             userInfo: context
-        ) else {
-            NSLog("NotchIsland: couldn't create the media key tap")
-            return false
-        }
-
-        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-        CGEvent.tapEnable(tap: tap, enable: true)
-        self.tap = tap
-        runLoopSource = source
-        NSLog("NotchIsland: media key takeover is on")
-        return true
+        )
     }
 
     func stop() {
@@ -122,6 +132,8 @@ final class MediaKeyTap {
         if let runLoopSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes) }
         self.tap = nil
         runLoopSource = nil
+        Self.isActive = false
+        DiagnosticsLog.write("Key takeover off.")
     }
 
     /// True when the event was one of our keys and should be swallowed (both press and release,
@@ -130,7 +142,7 @@ final class MediaKeyTap {
         if cgEvent.type == .keyDown || cgEvent.type == .keyUp {
             let code = cgEvent.getIntegerValueField(.keyboardEventKeycode)
             guard code == 144 || code == 145 else { return false }
-            NSLog("NotchIsland: brightness key (key code %lld)", code)
+            if cgEvent.type == .keyDown { DiagnosticsLog.write("Brightness key seen as key code \(code).") }
             if cgEvent.type == .keyDown {
                 let fine = cgEvent.flags.contains([.maskAlternate, .maskShift])
                 onKey?(code == 144 ? .brightnessUp : .brightnessDown, fine)
@@ -150,8 +162,8 @@ final class MediaKeyTap {
         case 3: key = .brightnessDown
         default: return false
         }
-        if key == .brightnessUp || key == .brightnessDown {
-            NSLog("NotchIsland: brightness key (media key %d)", keyCode)
+        if isDown, key == .brightnessUp || key == .brightnessDown {
+            DiagnosticsLog.write("Brightness key seen as media key \(keyCode).")
         }
         if isDown {
             let fine = event.modifierFlags.contains([.option, .shift])
