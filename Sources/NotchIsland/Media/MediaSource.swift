@@ -23,6 +23,23 @@ struct PlaybackSnapshot: Equatable {
         let value = elapsed + date.timeIntervalSince(timestamp)
         return duration > 0 ? min(value, duration) : value
     }
+
+    /// The state right after `command`, so the UI can update before the source confirms it.
+    func applying(_ command: MediaCommand, at date: Date = Date()) -> PlaybackSnapshot {
+        var next = self
+        switch command {
+        case .togglePlayPause:
+            next.elapsed = elapsed(at: date)
+            next.isPlaying.toggle()
+            next.timestamp = date
+        case .seek(let time):
+            next.elapsed = time
+            next.timestamp = date
+        case .next, .previous, .focus:
+            break
+        }
+        return next
+    }
 }
 
 enum MediaCommand {

@@ -8,6 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// A helper process that exits mid-write should fail the write, not kill the app.
+signal(SIGPIPE, SIG_IGN)
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

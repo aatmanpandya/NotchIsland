@@ -90,20 +90,7 @@ final class ScriptableAppSource: MediaSource {
         }
 
         // Update the UI right away instead of waiting for the round trip.
-        if var s = snapshot {
-            let now = Date()
-            switch command {
-            case .togglePlayPause:
-                s.elapsed = s.elapsed(at: now)
-                s.isPlaying.toggle()
-            case .seek(let time):
-                s.elapsed = time
-            case .next, .previous, .focus:
-                break
-            }
-            s.timestamp = now
-            snapshot = s
-        }
+        snapshot = snapshot?.applying(command)
 
         let script = """
         if application "\(target.appName)" is running then

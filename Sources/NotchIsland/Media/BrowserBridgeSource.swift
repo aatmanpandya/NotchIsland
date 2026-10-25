@@ -192,21 +192,7 @@ final class BrowserBridgeSource: MediaSource {
         case .focus: payload["action"] = "focus"
         }
 
-        if var s = snapshot {
-            let now = Date()
-            switch command {
-            case .togglePlayPause:
-                s.elapsed = s.elapsed(at: now)
-                s.isPlaying.toggle()
-                s.timestamp = now
-            case .seek(let time):
-                s.elapsed = time
-                s.timestamp = now
-            default:
-                break
-            }
-            snapshot = s
-        }
+        snapshot = snapshot?.applying(command)
 
         guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
         let meta = NWProtocolWebSocket.Metadata(opcode: .text)

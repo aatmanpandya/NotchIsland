@@ -36,11 +36,17 @@ final class NotchController {
     private var pendingToggle: DispatchWorkItem?
 
     init() {
-        let media = MediaController(sources: [
+        // Order is priority when several are playing: the dedicated sources give richer
+        // controls, and the system-wide source covers every other app.
+        var sources: [MediaSource] = [
             BrowserBridgeSource(),
             ScriptableAppSource(.spotify),
             ScriptableAppSource(.music),
-        ])
+        ]
+        #if DIRECT_DISTRIBUTION
+        if let system = SystemNowPlayingSource() { sources.append(system) }
+        #endif
+        let media = MediaController(sources: sources)
         viewModel = NotchViewModel(media: media, battery: BatteryService())
 
         let host = FirstMouseHostingView(rootView: NotchView(vm: viewModel))
