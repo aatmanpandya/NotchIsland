@@ -249,6 +249,7 @@ private struct CollapsedView: View {
 private struct ExpandedView: View {
     @ObservedObject var vm: NotchViewModel
     let namespace: Namespace.ID
+    @State private var isDropTargeted = false
 
     var body: some View {
         let inset = vm.topRadius(for: .expanded) + 20
@@ -272,6 +273,8 @@ private struct ExpandedView: View {
                         UpNextPanel(calendar: vm.calendar)
                             .frame(width: 168, alignment: .leading)
                     }
+                case .shelf:
+                    ShelfPanel(shelf: vm.shelf, isTargeted: isDropTargeted)
                 case .tools:
                     ToolsPanel(timer: vm.timer)
                 }
@@ -284,6 +287,17 @@ private struct ExpandedView: View {
         }
         .foregroundStyle(.white)
         .shadow(color: .black.opacity(0.4), radius: 3, y: 1)
+        // Files can be dropped anywhere on the open island; it switches to the shelf.
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            loadFileURLs(from: providers) { urls in
+                vm.tab = .shelf
+                vm.shelf.add(urls)
+            }
+            return true
+        }
+        .onChange(of: isDropTargeted) { _, targeted in
+            if targeted { withAnimation(.spring(duration: 0.3, bounce: 0.2)) { vm.tab = .shelf } }
+        }
     }
 }
 
@@ -316,6 +330,19 @@ private struct TabPills: View {
 }
 
 extension NotchViewModel.Tab {
-    var title: String { self == .home ? "Home" : "Tools" }
-    var symbol: String { self == .home ? "house.fill" : "timer" }
+    var title: String {
+        switch self {
+        case .home: "Home"
+        case .shelf: "Shelf"
+        case .tools: "Tools"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .home: "house.fill"
+        case .shelf: "tray.fill"
+        case .tools: "timer"
+        }
+    }
 }

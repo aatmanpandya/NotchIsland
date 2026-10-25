@@ -37,6 +37,12 @@ final class NotchController {
     /// Set by preview mode, so hovering doesn't change the pinned state.
     private var isPinned = false
 
+    // Spotting a file being dragged from another app: the drag pasteboard changes after the
+    // mouse goes down, and it holds file URLs.
+    private let dragPasteboard = NSPasteboard(name: .drag)
+    private var dragChangeCount = 0
+    private var isDraggingFile = false
+
     init() {
         // Order is priority when several are playing: the dedicated sources give richer
         // controls, and the system-wide source covers every other app.
@@ -51,7 +57,7 @@ final class NotchController {
         #endif
         let media = MediaController(sources: sources)
         viewModel = NotchViewModel(media: media, battery: BatteryService(), calendar: CalendarService(),
-                                   timer: TimerService(), bluetooth: BluetoothService())
+                                   timer: TimerService(), bluetooth: BluetoothService(), shelf: ShelfService())
         browser.onCallStarted = { [weak viewModel] site in viewModel?.callStarted(site: site) }
 
         let host = FirstMouseHostingView(rootView: NotchView(vm: viewModel))
@@ -65,12 +71,12 @@ final class NotchController {
         ) { [weak self] _ in self?.layout() }
 
         // Mouse-moved monitoring needs no Accessibility permission.
-        let events: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged]
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: events, handler: { [weak self] _ in
-            self?.trackMouse()
+        let events: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseDown, .leftMouseUp]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: events, handler: { [weak self] event in
+            self?.handle(event)
         }) { monitors.append(global) }
         if let local = NSEvent.addLocalMonitorForEvents(matching: events, handler: { [weak self] event in
-            self?.trackMouse()
+            self?.handle(event)
             return event
         }) { monitors.append(local) }
 
@@ -110,11 +116,43 @@ final class NotchController {
     }
 
     /// Clicks pass through the transparent panel except over the island itself.
+    private func handle(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown:
+            dragChangeCount = dragPasteboard.changeCount
+            isDraggingFile = false
+        case .leftMouseDragged where !isDraggingFile:
+            isDraggingFile = dragPasteboard.changeCount != dragChangeCount
+                && dragPasteboard.canReadObject(forClasses: [NSURL.self],
+                                                options: [.urlReadingFileURLsOnly: true])
+        case .leftMouseUp:
+            isDraggingFile = false
+        default:
+            break
+        }
+        trackMouse()
+    }
+
+    /// A file dragged near the notch opens the island straight onto the shelf.
+    private func openShelfForDrag() {
+        panel.ignoresMouseEvents = false
+        pendingToggle?.cancel()
+        pendingToggle = nil
+        viewModel.tab = .shelf
+        setExpanded(true)
+        viewModel.tab = .shelf
+    }
+
     private func trackMouse() {
         let expanded = viewModel.isExpanded
         let slop: CGFloat = expanded ? 6 : 10
-        let inside = islandRect(for: viewModel.mode).insetBy(dx: -slop, dy: -slop)
-            .contains(NSEvent.mouseLocation)
+        let mouse = NSEvent.mouseLocation
+        if isDraggingFile, !expanded, !isPinned,
+           islandRect(for: .collapsed).insetBy(dx: -90, dy: -40).contains(mouse) {
+            openShelfForDrag()
+            return
+        }
+        let inside = islandRect(for: viewModel.mode).insetBy(dx: -slop, dy: -slop).contains(mouse)
         panel.ignoresMouseEvents = !inside
 
         guard !isPinned, inside != expanded else {

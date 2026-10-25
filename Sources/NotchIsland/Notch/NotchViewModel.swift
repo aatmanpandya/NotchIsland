@@ -17,6 +17,7 @@ final class NotchViewModel: ObservableObject {
 
     enum Tab: CaseIterable {
         case home
+        case shelf
         case tools
     }
 
@@ -65,6 +66,7 @@ final class NotchViewModel: ObservableObject {
     let calendar: CalendarService
     let timer: TimerService
     let bluetooth: BluetoothService
+    let shelf: ShelfService
     let expandedSize = CGSize(width: 640, height: 210)
 
     private var cancellables = Set<AnyCancellable>()
@@ -74,12 +76,13 @@ final class NotchViewModel: ObservableObject {
     private let launchedAt = Date()
 
     init(media: MediaController, battery: BatteryService, calendar: CalendarService,
-         timer: TimerService, bluetooth: BluetoothService) {
+         timer: TimerService, bluetooth: BluetoothService, shelf: ShelfService) {
         self.media = media
         self.battery = battery
         self.calendar = calendar
         self.timer = timer
         self.bluetooth = bluetooth
+        self.shelf = shelf
         timer.onFinish = { [weak self] in self?.show(.timerDone, for: 12) }
         timer.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         bluetooth.onConnect = { [weak self] device in
@@ -203,6 +206,19 @@ final class NotchViewModel: ObservableObject {
         ]
         if name == "expanded" {
             isExpanded = true
+        } else if name == "shelf" {
+            // Sample files that aren't saved, so the real shelf stays as it was.
+            let pictures = URL(fileURLWithPath: "/System/Library/Desktop Pictures")
+            let samples = (try? FileManager.default.contentsOfDirectory(at: pictures, includingPropertiesForKeys: nil))?
+                .filter { ["heic", "jpg", "png"].contains($0.pathExtension.lowercased()) }
+                .prefix(2) ?? []
+            shelf.add(Array(samples) + [Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist")],
+                      persist: false)
+            isExpanded = true
+            tab = .shelf
+        } else if name == "dropzone" {
+            isExpanded = true
+            tab = .shelf
         } else if name == "tools" {
             isExpanded = true
             tab = .tools
