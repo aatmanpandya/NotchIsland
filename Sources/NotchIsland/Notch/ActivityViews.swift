@@ -206,11 +206,14 @@ private struct LevelPopUp: View {
 
     var body: some View {
         let shown = muted ? 0 : CGFloat(level)
-        Image(systemName: symbol)
+        // One symbol whose rays or waves fill in with the level, so it changes smoothly
+        // instead of swapping icons at fixed points.
+        Image(systemName: symbol, variableValue: Double(level))
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(accent)
-            .contentTransition(.symbolEffect(.replace))
+            .rotationEffect(.degrees(kind == .brightness ? Double(level) * 45 : 0))
             .frame(width: 28)
+            .animation(.spring(duration: 0.3, bounce: 0.15), value: level)
         VStack(alignment: .leading, spacing: 5) {
             if kind == .volume, !device.isEmpty {
                 Text(device)
@@ -233,13 +236,13 @@ private struct LevelPopUp: View {
     }
 
     private var symbol: String {
-        if kind == .brightness { return level < 0.5 ? "sun.min.fill" : "sun.max.fill" }
+        if kind == .brightness { return "sun.max.fill" }
         if muted || level == 0 { return "speaker.slash.fill" }
         let lowered = device.lowercased()
         if lowered.contains("airpods max") { return "airpodsmax" }
         if lowered.contains("airpods pro") { return "airpodspro" }
         if lowered.contains("airpods") { return "airpods" }
-        return level < 0.34 ? "speaker.wave.1.fill" : level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill"
+        return "speaker.wave.3.fill"
     }
 }
 
