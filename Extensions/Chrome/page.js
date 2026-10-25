@@ -25,6 +25,29 @@
 
   // Players such as Spotify's never attach their <audio> to the page, so remember anything that plays.
   const known = new Set();
+  // Record the page's own media-key handlers ("nexttrack", "previoustrack", ...) as it sets them.
+  // Calling these is exactly what the keyboard's media keys do, so it works on any site that
+  // supports them, without relying on finding the right on-screen button.
+  const actions = new Map();
+  if (navigator.mediaSession?.setActionHandler) {
+    const originalSetActionHandler = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
+    navigator.mediaSession.setActionHandler = (action, handler) => {
+      if (handler) actions.set(action, handler);
+      else actions.delete(action);
+      return originalSetActionHandler(action, handler);
+    };
+  }
+  function runAction(action) {
+    const handler = actions.get(action);
+    if (!handler) return false;
+    try {
+      handler({ action });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const originalPlay = HTMLMediaElement.prototype.play;
   HTMLMediaElement.prototype.play = function (...args) {
     track(this);
@@ -74,7 +97,7 @@
       playing: !el.paused && !el.ended,
       site: site.name,
       canSeek: site.canSeek !== false && duration > 0,
-      canSkip: Boolean(site.next),
+      canSkip: actions.has("nexttrack") || Boolean(site.next && document.querySelector(site.next)),
     };
   }
 
@@ -136,10 +159,12 @@
         if (!click(site.toggle) && el) el.paused ? el.play() : el.pause();
         break;
       case "next":
-        click(site.next);
+        if (!runAction("nexttrack")) click(site.next);
         break;
       case "previous":
-        if (!click(site.previous) && el) el.currentTime = 0;
+        // Like a music app: past the first few seconds, "previous" restarts the current item.
+        if (el && el.currentTime > 3 && site.name !== "Spotify") el.currentTime = 0;
+        else if (!runAction("previoustrack") && !click(site.previous) && el) el.currentTime = 0;
         break;
       case "seek":
         if (el && site.canSeek !== false) el.currentTime = event.data.time;
