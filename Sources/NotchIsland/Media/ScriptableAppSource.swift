@@ -77,11 +77,16 @@ final class ScriptableAppSource: MediaSource {
     }
 
     func send(_ command: MediaCommand) {
+        if case .focus = command {
+            NSRunningApplication.runningApplications(withBundleIdentifier: target.bundleID).first?.activate()
+            return
+        }
         let verb = switch command {
         case .togglePlayPause: "playpause"
         case .next: "next track"
         case .previous: "previous track"
         case .seek(let time): "set player position to \(time)"
+        case .focus: ""
         }
 
         // Update the UI right away instead of waiting for the round trip.
@@ -93,7 +98,7 @@ final class ScriptableAppSource: MediaSource {
                 s.isPlaying.toggle()
             case .seek(let time):
                 s.elapsed = time
-            case .next, .previous:
+            case .next, .previous, .focus:
                 break
             }
             s.timestamp = now

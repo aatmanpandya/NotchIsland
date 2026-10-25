@@ -1,0 +1,162 @@
+import SwiftUI
+
+extension NotchViewModel.Activity {
+    func accent(media: MediaController) -> Color {
+        switch self {
+        case .charging, .fullyCharged: .green
+        case .unplugged: .white
+        case .lowBattery: .red
+        case .nowPlaying: media.tint
+        }
+    }
+}
+
+/// The pop-up shown for a few seconds when something happens.
+struct ActivityView: View {
+    @ObservedObject var vm: NotchViewModel
+    let activity: NotchViewModel.Activity
+
+    var body: some View {
+        let accent = activity.accent(media: vm.media)
+        VStack(spacing: 0) {
+            // Top row: small "ears" on either side of the hardware notch.
+            HStack {
+                leadingEar.foregroundStyle(accent)
+                Spacer()
+                trailingEar.foregroundStyle(accent)
+            }
+            .font(.system(size: 13, weight: .bold).monospacedDigit())
+            .frame(height: vm.notchSize.height)
+            .padding(.horizontal, vm.topRadius(for: .activity(activity)) + 16)
+
+            HStack(spacing: 14) {
+                content(accent: accent)
+            }
+            .padding(.horizontal, vm.topRadius(for: .activity(activity)) + 18)
+            .frame(maxHeight: .infinity)
+            .padding(.bottom, 6)
+        }
+        .foregroundStyle(.white)
+    }
+
+    @ViewBuilder private var leadingEar: some View {
+        switch activity {
+        case .charging, .fullyCharged: Image(systemName: "bolt.fill").symbolEffect(.pulse)
+        case .unplugged: Image(systemName: "powerplug.fill")
+        case .lowBattery: Image(systemName: "exclamationmark.triangle.fill")
+        case .nowPlaying: ArtworkView(image: vm.media.current?.artwork, size: 20, corner: 5)
+        }
+    }
+
+    @ViewBuilder private var trailingEar: some View {
+        switch activity {
+        case .nowPlaying: AudioBars(isPlaying: true, color: vm.media.tint)
+        default: Text("\(vm.battery.level)%")
+        }
+    }
+
+    @ViewBuilder private func content(accent: Color) -> some View {
+        switch activity {
+        case .nowPlaying:
+            let now = vm.media.current
+            ArtworkView(image: now?.artwork, size: 38, corner: 9)
+                .shadow(color: accent.opacity(0.5), radius: 8)
+            titles(now?.title ?? "Now Playing", now?.artist ?? "")
+            Spacer(minLength: 0)
+            Image(systemName: "waveform")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(accent)
+                .symbolEffect(.variableColor.iterative)
+        default:
+            titles(batteryTitle, batterySubtitle)
+            Spacer(minLength: 0)
+            LiquidBattery(level: vm.battery.level, color: accent, isCharging: activity == .charging)
+                .frame(width: 128, height: 30)
+        }
+    }
+
+    private func titles(_ title: String, _ subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .lineLimit(1)
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var batteryTitle: String {
+        switch activity {
+        case .charging: "Charging"
+        case .unplugged: "On Battery"
+        case .fullyCharged: "Fully Charged"
+        case .lowBattery: "Low Battery"
+        case .nowPlaying: ""
+        }
+    }
+
+    private var batterySubtitle: String {
+        let battery = vm.battery
+        switch activity {
+        case .charging: return battery.minutesToFull.map { "Full in \($0.durationText)" } ?? "Power adapter connected"
+        case .unplugged: return battery.minutesToEmpty.map { "About \($0.durationText) left" } ?? "Power adapter disconnected"
+        case .fullyCharged: return "You can unplug now"
+        case .lowBattery: return "Plug in soon"
+        case .nowPlaying: return ""
+        }
+    }
+}
+
+/// A wide battery that fills up when it appears, with a moving sheen while charging.
+struct LiquidBattery: View {
+    let level: Int
+    let color: Color
+    let isCharging: Bool
+    @State private var shown: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { geo in
+            let body = geo.size.width - 5
+            HStack(spacing: 2) {
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(.white.opacity(0.1))
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: max(8, (body - 6) * shown))
+                        .overlay { if isCharging { Sheen() } }
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .shadow(color: color.opacity(0.6), radius: 8)
+                        .padding(3)
+                }
+                .frame(width: body)
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(.white.opacity(0.25))
+                    .frame(width: 3, height: geo.size.height * 0.35)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.9, dampingFraction: 0.75).delay(0.15)) {
+                shown = CGFloat(level) / 100
+            }
+        }
+    }
+}
+
+private struct Sheen: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
+            GeometryReader { geo in
+                LinearGradient(colors: [.clear, .white.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: geo.size.width * 0.4)
+                    .offset(x: (geo.size.width * 1.4) * phase - geo.size.width * 0.4)
+            }
+        }
+        .blendMode(.plusLighter)
+    }
+}

@@ -1,16 +1,24 @@
 import SwiftUI
 
 struct ClockPanel: View {
+    var tint: Color = .white
+
     var body: some View {
         TimelineView(.everyMinute) { context in
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(context.date, format: .dateTime.weekday(.wide))
+                    .font(.system(size: 11, weight: .bold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(tint)
                 Text(context.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
-                    .font(.system(size: 36, weight: .light, design: .rounded).monospacedDigit())
-                Text(context.date, format: .dateTime.weekday(.wide).month().day())
+                    .font(.system(size: 40, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(LinearGradient(colors: [.white, .white.opacity(0.7)], startPoint: .top, endPoint: .bottom))
+                    .contentTransition(.numericText())
+                Text(context.date, format: .dateTime.month(.wide).day())
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.5))
                 Spacer(minLength: 0)
-                WeekStrip(date: context.date)
+                WeekStrip(date: context.date, tint: tint)
             }
         }
     }
@@ -18,6 +26,7 @@ struct ClockPanel: View {
 
 private struct WeekStrip: View {
     let date: Date
+    let tint: Color
 
     var body: some View {
         let calendar = Calendar.current
@@ -34,7 +43,7 @@ private struct WeekStrip: View {
                         .font(.system(size: 11, weight: isToday ? .bold : .regular).monospacedDigit())
                         .foregroundStyle(isToday ? .black : .secondary)
                         .frame(width: 18, height: 18)
-                        .background(Circle().fill(isToday ? Color.white : .clear))
+                        .background(Circle().fill(isToday ? tint : .clear))
                 }
                 .frame(maxWidth: .infinity)
             }

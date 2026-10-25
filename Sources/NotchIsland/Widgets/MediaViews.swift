@@ -5,41 +5,60 @@ struct MediaPanel: View {
 
     var body: some View {
         if let now = media.current {
-            HStack(spacing: 14) {
-                ArtworkView(image: now.artwork, size: 96, corner: 14)
-                VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 16) {
+                Button { media.send(.focus) } label: {
+                    ArtworkView(image: now.artwork, size: 104, corner: 18)
+                        .shadow(color: media.tint.opacity(0.45), radius: 16, y: 6)
+                        .scaleEffect(now.isPlaying ? 1 : 0.9)
+                        .animation(.spring(response: 0.45, dampingFraction: 0.65), value: now.isPlaying)
+                }
+                .buttonStyle(PressScaleStyle())
+                .help("Open \(now.appName)")
+
+                VStack(alignment: .leading, spacing: 2) {
                     Text(now.title)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .lineLimit(1)
                     Text(now.artist)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
                         .lineLimit(1)
                     Spacer(minLength: 0)
                     ProgressRow(now: now, tint: media.tint) { media.send(.seek($0)) }
-                    HStack(spacing: 26) {
-                        ControlButton(symbol: "backward.fill", size: 15) { media.send(.previous) }
-                        ControlButton(symbol: now.isPlaying ? "pause.fill" : "play.fill", size: 22) {
-                            media.send(.togglePlayPause)
+                        .padding(.bottom, 6)
+                    HStack(spacing: 30) {
+                        ControlButton(symbol: "backward.fill", size: 16, enabled: now.canSkip || now.canSeek) {
+                            media.send(.previous)
                         }
-                        ControlButton(symbol: "forward.fill", size: 15) { media.send(.next) }
+                        PlayButton(isPlaying: now.isPlaying) { media.send(.togglePlayPause) }
+                        ControlButton(symbol: "forward.fill", size: 16, enabled: now.canSkip) {
+                            media.send(.next)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else {
-            VStack(spacing: 6) {
-                Image(systemName: "music.note")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.tertiary)
-                Text("Nothing playing")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("Play something in Music or Spotify")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(.white.opacity(0.06))
+                    Image(systemName: "music.note")
+                        .font(.system(size: 30, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+                .frame(width: 104, height: 104)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Nothing playing")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("Play music or video in Music, Spotify, or your browser.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
     }
 }
@@ -55,16 +74,17 @@ struct ArtworkView: View {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
             } else {
                 ZStack {
-                    LinearGradient(colors: [.gray.opacity(0.5), .gray.opacity(0.2)],
+                    LinearGradient(colors: [Color(white: 0.28), Color(white: 0.14)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing)
                     Image(systemName: "music.note")
-                        .font(.system(size: size * 0.4))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(.system(size: size * 0.38, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
             }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: corner, style: .continuous).stroke(.white.opacity(0.08), lineWidth: 0.5))
     }
 }
 
@@ -72,54 +92,97 @@ private struct ProgressRow: View {
     let now: PlaybackSnapshot
     let tint: Color
     let onSeek: (TimeInterval) -> Void
+    @State private var isHovered = false
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+        TimelineView(.periodic(from: .now, by: 0.25)) { context in
             let elapsed = now.elapsed(at: context.date)
             let fraction = now.duration > 0 ? min(1, elapsed / now.duration) : 0
-            HStack(spacing: 8) {
-                Text(Self.format(elapsed))
+            VStack(spacing: 4) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(.white.opacity(0.15))
-                        Capsule().fill(tint).frame(width: geo.size.width * fraction)
+                        Capsule().fill(.white.opacity(0.14))
+                        Capsule()
+                            .fill(LinearGradient(colors: [tint.opacity(0.7), tint], startPoint: .leading, endPoint: .trailing))
+                            .frame(width: max(isHovered ? 8 : 5, geo.size.width * fraction))
+                            .shadow(color: tint.opacity(0.6), radius: 4)
                     }
+                    .frame(height: isHovered ? 8 : 5)
+                    .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .onTapGesture { point in
+                        guard now.canSeek else { return }
                         onSeek(max(0, min(1, point.x / geo.size.width)) * now.duration)
                     }
                 }
-                .frame(height: 5)
-                Text("-" + Self.format(max(0, now.duration - elapsed)))
+                .frame(height: 10)
+                .onHover { isHovered = $0 && now.canSeek }
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+
+                HStack {
+                    Text(Self.format(elapsed))
+                    Spacer()
+                    Text(now.duration > 0 ? "-" + Self.format(max(0, now.duration - elapsed)) : "LIVE")
+                }
+                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.45))
             }
-            .font(.system(size: 10, weight: .medium).monospacedDigit())
-            .foregroundStyle(.secondary)
         }
     }
 
     private static func format(_ seconds: TimeInterval) -> String {
         let total = Int(seconds.rounded(.down))
+        if total >= 3600 { return String(format: "%d:%02d:%02d", total / 3600, total / 60 % 60, total % 60) }
         return String(format: "%d:%02d", total / 60, total % 60)
+    }
+}
+
+private struct PlayButton: View {
+    let isPlaying: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.black)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(.white))
+                .shadow(color: .white.opacity(0.25), radius: 8)
+        }
+        .buttonStyle(PressScaleStyle())
     }
 }
 
 private struct ControlButton: View {
     let symbol: String
     let size: CGFloat
+    var enabled = true
     let action: () -> Void
     @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: size))
-                .frame(width: size + 16, height: size + 12)
-                .background(Circle().fill(.white.opacity(isHovered ? 0.12 : 0)))
+                .font(.system(size: size, weight: .semibold))
+                .frame(width: size + 18, height: size + 14)
+                .background(Circle().fill(.white.opacity(isHovered && enabled ? 0.12 : 0)))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressScaleStyle())
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.3)
         .onHover { isHovered = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovered)
+    }
+}
+
+struct PressScaleStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.86 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.55), value: configuration.isPressed)
     }
 }
 
@@ -136,7 +199,9 @@ struct AudioBars: View {
             HStack(spacing: 2) {
                 ForEach(0..<speeds.count, id: \.self) { i in
                     let level = isPlaying ? 0.3 + 0.7 * abs(sin(t * speeds[i] + Double(i) * 1.3)) : 0.2
-                    Capsule().fill(color).frame(width: 3, height: 14 * level)
+                    Capsule()
+                        .fill(LinearGradient(colors: [color, color.opacity(0.6)], startPoint: .top, endPoint: .bottom))
+                        .frame(width: 3, height: 14 * level)
                 }
             }
             .frame(height: 14)

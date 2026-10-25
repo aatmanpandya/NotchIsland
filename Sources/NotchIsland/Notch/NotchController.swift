@@ -37,6 +37,7 @@ final class NotchController {
 
     init() {
         let media = MediaController(sources: [
+            BrowserBridgeSource(),
             ScriptableAppSource(.spotify),
             ScriptableAppSource(.music),
         ])
@@ -78,9 +79,9 @@ final class NotchController {
                               width: width, height: height), display: true)
     }
 
-    private func islandRect(expanded: Bool) -> NSRect {
+    private func islandRect(for mode: NotchViewModel.Mode) -> NSRect {
         guard let screen else { return .zero }
-        let size = viewModel.size(expanded: expanded)
+        let size = viewModel.size(for: mode)
         return NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height,
                       width: size.width, height: size.height)
     }
@@ -89,7 +90,7 @@ final class NotchController {
     private func trackMouse() {
         let expanded = viewModel.isExpanded
         let slop: CGFloat = expanded ? 6 : 10
-        let inside = islandRect(expanded: expanded).insetBy(dx: -slop, dy: -slop)
+        let inside = islandRect(for: viewModel.mode).insetBy(dx: -slop, dy: -slop)
             .contains(NSEvent.mouseLocation)
         panel.ignoresMouseEvents = !inside
 

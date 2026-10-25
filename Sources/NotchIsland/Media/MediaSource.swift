@@ -15,6 +15,8 @@ struct PlaybackSnapshot: Equatable {
     var elapsed: TimeInterval
     var timestamp: Date
     var isPlaying: Bool
+    var canSeek = true
+    var canSkip = true
 
     func elapsed(at date: Date) -> TimeInterval {
         guard isPlaying else { return elapsed }
@@ -28,6 +30,8 @@ enum MediaCommand {
     case next
     case previous
     case seek(TimeInterval)
+    /// Bring the app or browser tab that is playing to the front.
+    case focus
 }
 
 /// Anything that can report playback and accept commands: a scriptable app,

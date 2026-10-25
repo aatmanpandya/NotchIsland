@@ -4,40 +4,84 @@ import SwiftUI
 struct NotchView: View {
     @ObservedObject var vm: NotchViewModel
 
-    private let spring = Animation.spring(response: 0.42, dampingFraction: 0.8)
+    /// Slightly underdamped, so the island "plops" open like the iPhone's.
+    private let spring = Animation.spring(response: 0.45, dampingFraction: 0.7)
 
     var body: some View {
-        let expanded = vm.isExpanded
-        let size = vm.size(expanded: expanded)
+        let mode = vm.mode
+        let size = vm.size(for: mode)
+        let shape = NotchShape(topRadius: vm.topRadius(for: mode), bottomRadius: vm.bottomRadius(for: mode))
 
         ZStack(alignment: .top) {
-            if expanded {
+            switch mode {
+            case .expanded:
                 // Laid out at full size and revealed by the growing shape, so nothing reflows mid-animation.
                 ExpandedView(vm: vm)
                     .frame(width: vm.expandedSize.width, height: vm.expandedSize.height)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.94, anchor: .top))
-                            .animation(spring.delay(0.05)),
-                        removal: .opacity.animation(.easeOut(duration: 0.12))
-                    ))
-            } else {
+                    .transition(contentTransition)
+            case .activity(let activity):
+                ActivityView(vm: vm, activity: activity)
+                    .frame(width: size.width, height: size.height)
+                    .transition(contentTransition)
+                    .id(activity)
+                    .onTapGesture { vm.isExpanded = true }
+            case .collapsed:
                 CollapsedView(vm: vm)
                     .frame(width: size.width, height: size.height)
-                    .transition(.opacity)
+                    .transition(.opacity.animation(.easeOut(duration: 0.15)))
                     .onTapGesture { vm.isExpanded = true }
             }
         }
         .frame(width: size.width, height: size.height, alignment: .top)
-        .background(Color.black)
-        .clipShape(NotchShape(topRadius: vm.topRadius(expanded: expanded),
-                              bottomRadius: vm.bottomRadius(expanded: expanded)))
-        .shadow(color: .black.opacity(expanded ? 0.45 : 0), radius: 16, y: 6)
+        .background { IslandBackground(vm: vm, mode: mode) }
+        .clipShape(shape)
+        .overlay { shape.stroke(.white.opacity(mode == .collapsed ? 0 : 0.08), lineWidth: 1) }
+        .shadow(color: .black.opacity(mode == .collapsed ? 0 : 0.5), radius: 18, y: 8)
         .contextMenu { IslandMenu() }
-        .animation(spring, value: expanded)
+        .animation(spring, value: mode)
         .animation(spring, value: vm.showsEars)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+    }
+
+    private var contentTransition: AnyTransition {
+        .asymmetric(
+            insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top))
+                .combined(with: .offset(y: -6))
+                .animation(spring.delay(0.06)),
+            removal: .opacity.animation(.easeOut(duration: 0.1))
+        )
+    }
+}
+
+/// Black, with a soft glow of the artwork or the pop-up's color bleeding in from the left.
+private struct IslandBackground: View {
+    @ObservedObject var vm: NotchViewModel
+    let mode: NotchViewModel.Mode
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Color.black
+            switch mode {
+            case .expanded:
+                if let artwork = vm.media.current?.artwork {
+                    Image(nsImage: artwork)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 300, height: 300)
+                        .blur(radius: 70)
+                        .opacity(0.5)
+                        .offset(x: -40)
+                }
+                LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .top, endPoint: .bottom)
+            case .activity(let activity):
+                RadialGradient(colors: [activity.accent(media: vm.media).opacity(0.35), .clear],
+                               center: .leading, startRadius: 0, endRadius: 220)
+            case .collapsed:
+                EmptyView()
+            }
+        }
     }
 }
 
@@ -59,34 +103,21 @@ private struct CollapsedView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            if vm.showsEars { leading.frame(width: vm.earWidth) }
+            if vm.showsEars {
+                ArtworkView(image: vm.media.current?.artwork, size: 22, corner: 6)
+                    .shadow(color: vm.media.tint.opacity(0.6), radius: 6)
+                    .frame(width: vm.earWidth)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+            }
             Color.clear.frame(width: vm.notchSize.width)
-            if vm.showsEars { trailing.frame(width: vm.earWidth) }
+            if vm.showsEars {
+                AudioBars(isPlaying: true, color: vm.media.tint)
+                    .frame(width: vm.earWidth)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+            }
         }
-        .padding(.horizontal, vm.topRadius(expanded: false))
+        .padding(.horizontal, vm.topRadius(for: .collapsed))
         .contentShape(Rectangle())
-    }
-
-    @ViewBuilder private var leading: some View {
-        switch vm.alert {
-        case .charging:
-            Image(systemName: "bolt.fill").foregroundStyle(.green)
-        case .unplugged:
-            Image(systemName: "bolt.slash.fill").foregroundStyle(.white.opacity(0.7))
-        case nil:
-            ArtworkView(image: vm.media.current?.artwork, size: 20, corner: 5)
-        }
-    }
-
-    @ViewBuilder private var trailing: some View {
-        switch vm.alert {
-        case .charging(let level):
-            Text("\(level)%").foregroundStyle(.green)
-        case .unplugged(let level):
-            Text("\(level)%").foregroundStyle(.white.opacity(0.8))
-        case nil:
-            AudioBars(isPlaying: vm.media.current?.isPlaying == true, color: vm.media.tint)
-        }
     }
 }
 
@@ -96,32 +127,52 @@ private struct ExpandedView: View {
     @ObservedObject var vm: NotchViewModel
 
     var body: some View {
-        let inset = vm.topRadius(expanded: true) + 18
+        let inset = vm.topRadius(for: .expanded) + 20
         VStack(spacing: 0) {
             // The header shares the menu bar row with the hardware notch, so it hugs the sides.
             HStack {
-                if let now = vm.media.current {
-                    Label(now.appName, systemImage: "waveform")
-                } else {
-                    Text("NotchIsland")
-                }
+                SourceBadge(snapshot: vm.media.current, tint: vm.media.tint)
                 Spacer()
                 BatteryIndicator(battery: vm.battery)
             }
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
             .frame(height: vm.notchSize.height)
             .padding(.horizontal, inset)
 
-            HStack(spacing: 18) {
+            HStack(spacing: 20) {
                 MediaPanel(media: vm.media)
-                Rectangle().fill(.white.opacity(0.08)).frame(width: 1)
-                ClockPanel().frame(width: 150, alignment: .leading)
+                LinearGradient(colors: [.clear, .white.opacity(0.12), .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(width: 1)
+                ClockPanel(tint: vm.media.current == nil ? .white : vm.media.tint)
+                    .frame(width: 156, alignment: .leading)
             }
             .padding(.horizontal, inset)
-            .padding(.top, 10)
-            .padding(.bottom, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 22)
         }
         .foregroundStyle(.white)
+    }
+}
+
+private struct SourceBadge: View {
+    let snapshot: PlaybackSnapshot?
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(width: 16, height: 16)
+                .background(RoundedRectangle(cornerRadius: 4.5, style: .continuous).fill(tint))
+            Text(snapshot?.appName ?? "NotchIsland")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.75))
+                .lineLimit(1)
+        }
+    }
+
+    private var symbol: String {
+        guard let snapshot else { return "sparkles" }
+        return snapshot.sourceID == "browser" ? "play.rectangle.fill" : "music.note"
     }
 }
