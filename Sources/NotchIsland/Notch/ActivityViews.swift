@@ -7,6 +7,7 @@ extension NotchViewModel.Activity {
         case .unplugged: .white
         case .lowBattery: .red
         case .nowPlaying: media.tint
+        case .call: .green
         }
     }
 }
@@ -23,7 +24,14 @@ struct ActivityView: View {
             // Top row, beside the hardware notch. The now-playing pop-up leaves it empty so the
             // artwork and bars below aren't shown twice.
             HStack {
-                if activity != .nowPlaying {
+                switch activity {
+                case .nowPlaying:
+                    EmptyView()
+                case .call:
+                    Image(systemName: "video.fill").foregroundStyle(accent)
+                    Spacer()
+                    CallTimer(startedAt: vm.call?.startedAt ?? Date()).foregroundStyle(accent)
+                default:
                     batteryIcon.foregroundStyle(accent)
                     Spacer()
                     Text("\(vm.battery.level)%").foregroundStyle(accent)
@@ -48,7 +56,7 @@ struct ActivityView: View {
         case .charging, .fullyCharged: Image(systemName: "bolt.fill").symbolEffect(.pulse)
         case .unplugged: Image(systemName: "powerplug.fill")
         case .lowBattery: Image(systemName: "exclamationmark.triangle.fill")
-        case .nowPlaying: EmptyView()
+        case .nowPlaying, .call: EmptyView()
         }
     }
 
@@ -63,6 +71,15 @@ struct ActivityView: View {
             Spacer(minLength: 0)
             AudioBars(isPlaying: true, color: accent, height: 20)
                 .matchedGeometryEffect(id: IslandMotion.barsID, in: namespace)
+        case .call:
+            Image(systemName: "person.2.wave.2.fill")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(accent.opacity(0.18)))
+            titles("Call started", vm.call?.site ?? "")
+            Spacer(minLength: 0)
+            LiveBadge(color: accent)
         default:
             titles(batteryTitle, batterySubtitle)
             Spacer(minLength: 0)
@@ -91,7 +108,7 @@ struct ActivityView: View {
         case .unplugged: "On Battery"
         case .fullyCharged: "Fully Charged"
         case .lowBattery: "Low Battery"
-        case .nowPlaying: ""
+        case .nowPlaying, .call: ""
         }
     }
 
@@ -102,8 +119,43 @@ struct ActivityView: View {
         case .unplugged: return battery.minutesToEmpty.map { "About \($0.durationText) left" } ?? "Power adapter disconnected"
         case .fullyCharged: return "You can unplug now"
         case .lowBattery: return "Plug in soon"
-        case .nowPlaying: return ""
+        case .nowPlaying, .call: return ""
         }
+    }
+}
+
+/// Time since the call started, ticking every second.
+private struct CallTimer: View {
+    let startedAt: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: startedAt, by: 1)) { context in
+            let seconds = max(0, Int(context.date.timeIntervalSince(startedAt)))
+            Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
+                .contentTransition(.numericText())
+        }
+    }
+}
+
+private struct LiveBadge: View {
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+                .shadow(color: color, radius: 4)
+                .phaseAnimator([1.0, 0.35]) { dot, opacity in dot.opacity(opacity) } animation: { _ in
+                    .easeInOut(duration: 0.7)
+                }
+            Text("LIVE")
+                .font(.system(size: 10, weight: .heavy))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(color.opacity(0.15)))
     }
 }
 

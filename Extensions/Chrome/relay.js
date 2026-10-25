@@ -1,8 +1,11 @@
 // Passes messages between the page script and the extension's background worker.
 window.addEventListener("message", (event) => {
-  if (event.source !== window || event.data?.__notchIsland !== "state") return;
+  if (event.source !== window) return;
+  const kind = event.data?.__notchIsland;
+  if (kind !== "state" && kind !== "call") return;
+  const message = kind === "state" ? { type: "state", state: event.data.state } : { type: "call", call: event.data.call };
   try {
-    chrome.runtime.sendMessage({ type: "state", state: event.data.state }).catch(() => {});
+    chrome.runtime.sendMessage(message).catch(() => {});
   } catch {
     // The extension was reloaded; this page's copy is orphaned until it refreshes.
   }

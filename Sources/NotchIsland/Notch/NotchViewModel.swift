@@ -9,6 +9,12 @@ final class NotchViewModel: ObservableObject {
         case fullyCharged
         case lowBattery
         case nowPlaying
+        case call
+    }
+
+    struct CallInfo {
+        let site: String
+        let startedAt: Date
     }
 
     enum Mode: Equatable {
@@ -20,6 +26,8 @@ final class NotchViewModel: ObservableObject {
     @Published var isExpanded = false
     @Published private(set) var notchSize = CGSize(width: 185, height: 32)
     @Published private(set) var activity: Activity?
+    /// The call announced by the most recent call pop-up.
+    @Published private(set) var call: CallInfo?
     /// Whether the ears are currently out; they tuck away a few seconds after playback starts.
     @Published private(set) var earsRevealed = false
 
@@ -124,6 +132,12 @@ final class NotchViewModel: ObservableObject {
     }
 
     /// Extends the reveal; a shorter request never cuts an earlier, longer one short.
+    /// Announce a call for a few seconds, even over something that is playing.
+    func callStarted(site: String) {
+        call = CallInfo(site: site, startedAt: Date())
+        show(.call, for: 5)
+    }
+
     private func revealEars(for seconds: TimeInterval) {
         let hideAt = Date().addingTimeInterval(seconds)
         if earsRevealed, let current = earsHideAt, current > hideAt { return }

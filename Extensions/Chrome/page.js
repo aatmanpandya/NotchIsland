@@ -13,6 +13,11 @@
     { host: /(^|\.)twitch\.tv$/, name: "Twitch", canSeek: false },
     { host: /(^|\.)primevideo\.com$/, name: "Prime Video" },
     { host: /(^|\.)disneyplus\.com$/, name: "Disney+" },
+    { host: /(^|\.)meet\.google\.com$/, name: "Google Meet" },
+    { host: /(^|\.)zoom\.us$/, name: "Zoom" },
+    { host: /(^|\.)teams\.(microsoft|live)\.com$/, name: "Microsoft Teams" },
+    { host: /(^|\.)discord\.com$/, name: "Discord" },
+    { host: /(^|\.)slack\.com$/, name: "Slack" },
   ];
   const site = SITES.find((s) => s.host.test(location.hostname)) || {
     name: location.hostname.replace(/^www\./, ""),
@@ -87,7 +92,35 @@
     window.postMessage({ __notchIsland: "state", state: s }, location.origin);
   }
   setInterval(report, 1000);
-  window.addEventListener("pagehide", () => window.postMessage({ __notchIsland: "state", state: null }, location.origin));
+  window.addEventListener("pagehide", () => {
+    window.postMessage({ __notchIsland: "state", state: null }, location.origin);
+    window.postMessage({ __notchIsland: "call", call: null }, location.origin);
+  });
+
+  // A call is live once the page plays someone's audio from a live stream. A camera preview
+  // before joining has no remote audio, so it doesn't count.
+  function inCall() {
+    const elements = new Set([...document.querySelectorAll("audio, video"), ...known]);
+    return [...elements].some(
+      (el) =>
+        el.srcObject instanceof MediaStream &&
+        !el.paused &&
+        el.srcObject.getAudioTracks().some((track) => track.readyState === "live")
+    );
+  }
+
+  // Calls are reported apart from media, so a video keeps playing in the island during a call.
+  // Resent now and then so the extension recovers it if its background worker restarts.
+  let wasInCall = false;
+  let lastCallSent = 0;
+  setInterval(() => {
+    const active = inCall();
+    if (active === wasInCall && !(active && Date.now() - lastCallSent > 10000)) return;
+    wasInCall = active;
+    lastCallSent = Date.now();
+    const call = active ? { site: site.name, title: document.title } : null;
+    window.postMessage({ __notchIsland: "call", call }, location.origin);
+  }, 1000);
 
   function click(selector) {
     const button = selector && document.querySelector(selector);

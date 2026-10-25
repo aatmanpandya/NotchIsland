@@ -27,10 +27,17 @@ final class BrowserBridgeSource: MediaSource {
         let updatedAt: Double
     }
 
+    private struct Call: Decodable {
+        let tabId: Int
+        let site: String
+        let title: String
+    }
+
     private struct Message: Decodable {
         let type: String
         let browser: String?
         let tabs: [Tab]?
+        let calls: [Call]?
     }
 
     private struct Browser {
@@ -38,6 +45,13 @@ final class BrowserBridgeSource: MediaSource {
         var name = "Browser"
         var tabs: [Tab] = []
     }
+
+    /// Called once when a video call starts in a browser tab (Meet, Zoom, Teams, ...).
+    var onCallStarted: ((_ site: String) -> Void)?
+    /// Last time each call was reported. A call missing for a while counts as new when it returns;
+    /// a brief gap (the extension reconnecting) doesn't announce it again.
+    private var callsLastSeen: [String: Date] = [:]
+    private let callForgetAfter: TimeInterval = 60
 
     private var listener: NWListener?
     private var browsers: [ObjectIdentifier: Browser] = [:]
@@ -123,9 +137,21 @@ final class BrowserBridgeSource: MediaSource {
     private func handle(_ data: Data, from key: ObjectIdentifier) {
         guard let message = try? JSONDecoder().decode(Message.self, from: data),
               message.type == "state" else { return }
-        browsers[key]?.name = message.browser ?? "Browser"
+        let browserName = message.browser ?? "Browser"
+        browsers[key]?.name = browserName
         browsers[key]?.tabs = message.tabs ?? []
+        noteCalls(message.calls ?? [], in: browserName)
         recompute()
+    }
+
+    private func noteCalls(_ calls: [Call], in browserName: String) {
+        let now = Date()
+        for call in calls {
+            let id = "\(browserName)-\(call.tabId)"
+            let isNew = callsLastSeen[id].map { now.timeIntervalSince($0) > callForgetAfter } ?? true
+            callsLastSeen[id] = now
+            if isNew { onCallStarted?(call.site) }
+        }
     }
 
     // MARK: - Snapshot

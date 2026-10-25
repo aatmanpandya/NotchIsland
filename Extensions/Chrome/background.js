@@ -1,6 +1,7 @@
 // Keeps one WebSocket to the NotchIsland app and forwards each tab's playback state to it.
 const PORT = 47823;
-const tabs = new Map(); // tabId -> latest state
+const tabs = new Map(); // tabId -> latest media state
+const calls = new Map(); // tabId -> { site, title } while a call is live
 
 const BROWSER =
   navigator.userAgentData?.brands?.map((b) => b.brand).find((b) => !/Chromium|Not.?A.?Brand/i.test(b)) ||
@@ -31,7 +32,8 @@ function connect() {
 function sync() {
   if (socket?.readyState !== WebSocket.OPEN) return;
   const list = [...tabs.entries()].map(([tabId, state]) => ({ tabId, ...state }));
-  socket.send(JSON.stringify({ type: "state", browser: shortName, tabs: list }));
+  const callList = [...calls.entries()].map(([tabId, call]) => ({ tabId, ...call }));
+  socket.send(JSON.stringify({ type: "state", browser: shortName, tabs: list, calls: callList }));
 }
 
 async function handleCommand({ tabId, action, time }) {
@@ -44,15 +46,25 @@ async function handleCommand({ tabId, action, time }) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender) => {
-  if (message.type !== "state" || !sender.tab) return;
-  if (message.state) tabs.set(sender.tab.id, { ...message.state, updatedAt: Date.now() });
-  else tabs.delete(sender.tab.id);
+  if (!sender.tab) return;
+  const tabId = sender.tab.id;
+  if (message.type === "state") {
+    if (message.state) tabs.set(tabId, { ...message.state, updatedAt: Date.now() });
+    else tabs.delete(tabId);
+  } else if (message.type === "call") {
+    if (message.call) calls.set(tabId, message.call);
+    else calls.delete(tabId);
+  } else {
+    return;
+  }
   connect();
   sync();
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  if (tabs.delete(tabId)) sync();
+  const hadMedia = tabs.delete(tabId);
+  const hadCall = calls.delete(tabId);
+  if (hadMedia || hadCall) sync();
 });
 
 // Regular traffic keeps the worker alive while connected; reconnect if the app was restarted.

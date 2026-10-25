@@ -38,8 +38,9 @@ final class NotchController {
     init() {
         // Order is priority when several are playing: the dedicated sources give richer
         // controls, and the system-wide source covers every other app.
+        let browser = BrowserBridgeSource()
         var sources: [MediaSource] = [
-            BrowserBridgeSource(),
+            browser,
             ScriptableAppSource(.spotify),
             ScriptableAppSource(.music),
         ]
@@ -48,6 +49,7 @@ final class NotchController {
         #endif
         let media = MediaController(sources: sources)
         viewModel = NotchViewModel(media: media, battery: BatteryService())
+        browser.onCallStarted = { [weak viewModel] site in viewModel?.callStarted(site: site) }
 
         let host = FirstMouseHostingView(rootView: NotchView(vm: viewModel))
         host.sizingOptions = []
