@@ -50,7 +50,8 @@ final class NotchController {
         if let system = SystemNowPlayingSource() { sources.append(system) }
         #endif
         let media = MediaController(sources: sources)
-        viewModel = NotchViewModel(media: media, battery: BatteryService(), calendar: CalendarService())
+        viewModel = NotchViewModel(media: media, battery: BatteryService(), calendar: CalendarService(),
+                                   timer: TimerService(), bluetooth: BluetoothService())
         browser.onCallStarted = { [weak viewModel] site in viewModel?.callStarted(site: site) }
 
         let host = FirstMouseHostingView(rootView: NotchView(vm: viewModel))
@@ -102,8 +103,10 @@ final class NotchController {
     private func islandRect(for mode: NotchViewModel.Mode) -> NSRect {
         guard let screen else { return .zero }
         let size = viewModel.size(for: mode)
+        // The timer bubble sits to the right of the collapsed island and is clickable too.
+        let bubble = mode == .collapsed && viewModel.showsTimerBubble ? viewModel.notchSize.height + 6 : 0
         return NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height,
-                      width: size.width, height: size.height)
+                      width: size.width + bubble, height: size.height)
     }
 
     /// Clicks pass through the transparent panel except over the island itself.

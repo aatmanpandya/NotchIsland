@@ -76,7 +76,19 @@ struct NotchView: View {
         .shadow(color: .black.opacity(mode == .collapsed ? 0 : 0.35), radius: 24, y: 10)
         .contextMenu { IslandMenu() }
         .animation(style.shape, value: mode)
-        .animation(style.shape, value: vm.showsEars)
+        .overlay(alignment: .topTrailing) {
+            if mode == .collapsed, vm.showsTimerBubble {
+                TimerBubble(timer: vm.timer, size: vm.notchSize.height)
+                    .offset(x: vm.notchSize.height + 6)
+                    .transition(.scale(scale: 0.3, anchor: .leading).combined(with: .opacity))
+                    .onTapGesture {
+                        vm.isExpanded = true
+                        vm.tab = .tools
+                    }
+            }
+        }
+        .animation(style.shape, value: vm.ears)
+        .animation(style.shape, value: vm.showsTimerBubble)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
@@ -198,19 +210,33 @@ private struct CollapsedView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            if vm.showsEars {
+            switch vm.ears {
+            case .media:
                 ArtworkView(image: vm.media.current?.artwork, size: 22, corner: 6)
                     .matchedGeometryEffect(id: IslandMotion.artworkID, in: namespace)
                     .shadow(color: vm.media.tint.opacity(0.6), radius: 6)
                     .frame(width: vm.earWidth)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
+            case .timer:
+                TimerTicker(timer: vm.timer, showsTime: false)
+                    .frame(width: vm.earWidth)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+            case .none:
+                EmptyView()
             }
             Color.clear.frame(width: vm.notchSize.width)
-            if vm.showsEars {
+            switch vm.ears {
+            case .media:
                 AudioBars(isPlaying: true, color: vm.media.tint)
                     .matchedGeometryEffect(id: IslandMotion.barsID, in: namespace)
                     .frame(width: vm.earWidth)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
+            case .timer:
+                TimerTicker(timer: vm.timer, showsTime: true)
+                    .frame(width: vm.earWidth)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+            case .none:
+                EmptyView()
             }
         }
         .padding(.horizontal, vm.topRadius(for: .collapsed))
@@ -229,20 +255,29 @@ private struct ExpandedView: View {
         VStack(spacing: 0) {
             // The header shares the menu bar row with the hardware notch, so it hugs the sides.
             HStack {
-                SourceBadge(snapshot: vm.media.current, tint: vm.media.tint)
+                TabPills(selection: $vm.tab)
                 Spacer()
                 BatteryIndicator(battery: vm.battery)
             }
             .frame(height: vm.notchSize.height)
-            .padding(.horizontal, inset)
+            .padding(.horizontal, inset - 6)
 
-            HStack(spacing: 20) {
-                MediaPanel(media: vm.media, namespace: namespace)
-                LinearGradient(colors: [.clear, .white.opacity(0.12), .clear], startPoint: .top, endPoint: .bottom)
-                    .frame(width: 1)
-                UpNextPanel(calendar: vm.calendar)
-                    .frame(width: 168, alignment: .leading)
+            Group {
+                switch vm.tab {
+                case .home:
+                    HStack(spacing: 20) {
+                        MediaPanel(media: vm.media, namespace: namespace)
+                        LinearGradient(colors: [.clear, .white.opacity(0.12), .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(width: 1)
+                        UpNextPanel(calendar: vm.calendar)
+                            .frame(width: 168, alignment: .leading)
+                    }
+                case .tools:
+                    ToolsPanel(timer: vm.timer)
+                }
             }
+            .id(vm.tab)
+            .transition(.opacity.combined(with: .scale(scale: 0.97)).animation(.spring(duration: 0.3, bounce: 0.1)))
             .padding(.horizontal, inset)
             .padding(.top, 12)
             .padding(.bottom, 22)
@@ -252,26 +287,35 @@ private struct ExpandedView: View {
     }
 }
 
-private struct SourceBadge: View {
-    let snapshot: PlaybackSnapshot?
-    let tint: Color
+/// Small tabs in the top row, beside the notch. The selected one shows its name.
+private struct TabPills: View {
+    @Binding var selection: NotchViewModel.Tab
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.black)
-                .frame(width: 16, height: 16)
-                .background(RoundedRectangle(cornerRadius: 4.5, style: .continuous).fill(tint))
-            Text(snapshot?.appName ?? "NotchIsland")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.75))
-                .lineLimit(1)
+        HStack(spacing: 4) {
+            ForEach(NotchViewModel.Tab.allCases, id: \.self) { tab in
+                let selected = tab == selection
+                Button {
+                    withAnimation(.spring(duration: 0.3, bounce: 0.2)) { selection = tab }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: tab.symbol)
+                        if selected { Text(tab.title) }
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(selected ? 1 : 0.55))
+                    .padding(.horizontal, selected ? 10 : 7)
+                    .frame(height: 22)
+                    .background(Capsule().fill(.white.opacity(selected ? 0.16 : 0)))
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(PressScaleStyle())
+            }
         }
     }
+}
 
-    private var symbol: String {
-        guard let snapshot else { return "sparkles" }
-        return snapshot.sourceID == "browser" ? "play.rectangle.fill" : "music.note"
-    }
+extension NotchViewModel.Tab {
+    var title: String { self == .home ? "Home" : "Tools" }
+    var symbol: String { self == .home ? "house.fill" : "timer" }
 }

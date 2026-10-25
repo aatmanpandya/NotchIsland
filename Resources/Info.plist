@@ -26,6 +26,10 @@
 	<string>NotchIsland shows your next meeting in the notch, with a Join button and a reminder 5 minutes before it starts.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>NotchIsland shows your next meeting in the notch, with a Join button and a reminder 5 minutes before it starts.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>NotchIsland shows a quick mirror in the notch so you can check how you look before a call. Nothing is recorded.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>NotchIsland shows a pop-up when your AirPods or other Bluetooth devices connect.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>NotchIsland reads what's playing in Music and Spotify and lets you control playback from the notch.</string>
 </dict>

@@ -9,6 +9,8 @@ extension NotchViewModel.Activity {
         case .nowPlaying: vm.media.tint
         case .call: .green
         case .meetingSoon: vm.soonMeeting?.color ?? .blue
+        case .timerDone: .orange
+        case .deviceConnected: .blue
         }
     }
 }
@@ -32,6 +34,16 @@ struct ActivityView: View {
                     Image(systemName: "video.fill").foregroundStyle(accent)
                     Spacer()
                     CallTimer(startedAt: vm.call?.startedAt ?? Date()).foregroundStyle(accent)
+                case .timerDone:
+                    Image(systemName: "timer").foregroundStyle(accent)
+                    Spacer()
+                    Text("0:00").foregroundStyle(accent)
+                case .deviceConnected:
+                    Image(systemName: "dot.radiowaves.left.and.right").foregroundStyle(accent)
+                    Spacer()
+                    if let battery = vm.connectedDevice?.batteryPercent {
+                        Text("\(battery)%").foregroundStyle(battery <= 20 ? .red : .green)
+                    }
                 case .meetingSoon:
                     Image(systemName: "calendar").foregroundStyle(accent)
                     Spacer()
@@ -66,7 +78,7 @@ struct ActivityView: View {
         case .charging, .fullyCharged: Image(systemName: "bolt.fill").symbolEffect(.pulse)
         case .unplugged: Image(systemName: "powerplug.fill")
         case .lowBattery: Image(systemName: "exclamationmark.triangle.fill")
-        case .nowPlaying, .call, .meetingSoon: EmptyView()
+        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected: EmptyView()
         }
     }
 
@@ -104,6 +116,35 @@ struct ActivityView: View {
             titles(batteryTitle, batterySubtitle)
             Spacer(minLength: 0)
             LowPowerButton(battery: vm.battery)
+        case .timerDone:
+            Image(systemName: "bell.fill")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(accent.opacity(0.18)))
+                .symbolEffect(.pulse)
+            titles("Time's up", "Timer finished")
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                PopUpButton(title: "+1 min", tint: .white.opacity(0.16), foreground: .white) {
+                    vm.timer.addMinute()
+                    vm.dismissActivity()
+                }
+                PopUpButton(title: "Dismiss", tint: accent, foreground: .black) { vm.dismissActivity() }
+            }
+        case .deviceConnected:
+            let device = vm.connectedDevice
+            Image(systemName: device?.symbol ?? "dot.radiowaves.left.and.right")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(accent.opacity(0.25)))
+            titles(device?.name ?? "Device", "Connected")
+            Spacer(minLength: 0)
+            if let battery = device?.batteryPercent {
+                LiquidBattery(level: battery, color: battery <= 20 ? .red : .green, isCharging: false)
+                    .frame(width: 96, height: 26)
+            }
         default:
             titles(batteryTitle, batterySubtitle)
             Spacer(minLength: 0)
@@ -132,7 +173,7 @@ struct ActivityView: View {
         case .unplugged: "On Battery"
         case .fullyCharged: "Fully Charged"
         case .lowBattery: "Low Battery"
-        case .nowPlaying, .call, .meetingSoon: ""
+        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected: ""
         }
     }
 
@@ -143,8 +184,27 @@ struct ActivityView: View {
         case .unplugged: return battery.minutesToEmpty.map { "About \($0.durationText) left" } ?? "Power adapter disconnected"
         case .fullyCharged: return "You can unplug now"
         case .lowBattery: return "\(battery.level)% remaining"
-        case .nowPlaying, .call, .meetingSoon: return ""
+        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected: return ""
         }
+    }
+}
+
+private struct PopUpButton: View {
+    let title: String
+    let tint: Color
+    let foreground: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(foreground)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(tint))
+        }
+        .buttonStyle(PressScaleStyle())
     }
 }
 

@@ -135,6 +135,8 @@ private struct PopUpSettings: View {
     @AppStorage(Preferences.Key.popUp("call")) private var call = true
     @AppStorage(Preferences.Key.popUp("meetingSoon")) private var meeting = true
     @AppStorage(Preferences.Key.meetingLeadMinutes) private var lead = 5
+    @AppStorage(Preferences.Key.popUp("deviceConnected")) private var device = true
+    @AppStorage(Preferences.Key.popUp("timerDone")) private var timerDone = true
 
     var body: some View {
         Form {
@@ -155,6 +157,10 @@ private struct PopUpSettings: View {
                 }
                 .disabled(!meeting)
                 CalendarAccessRow(calendar: calendar)
+            }
+            Section("Devices and timer") {
+                Toggle("A Bluetooth device connects", isOn: $device)
+                Toggle("A timer finishes", isOn: $timerDone)
             }
         }
         .formStyle(.grouped)

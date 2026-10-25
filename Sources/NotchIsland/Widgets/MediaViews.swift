@@ -18,6 +18,10 @@ struct MediaPanel: View {
                 .help("Open \(now.appName)")
 
                 VStack(alignment: .leading, spacing: 2) {
+                    Label(now.appName, systemImage: now.sourceID == "browser" ? "play.rectangle.fill" : "music.note")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(media.tint)
+                        .lineLimit(1)
                     Text(now.title)
                         .font(.system(size: 15, weight: .semibold))
                         .lineLimit(1)
