@@ -266,23 +266,37 @@ private struct PopUpButton: View {
 }
 
 /// Like the iPhone's low-battery alert: one tap toward Low Power Mode, and "On" once it's enabled.
+/// A Low Power Mode toggle: yellow with a leaf when on, glass when off. It follows the real
+/// setting, so it also updates if Low Power Mode is changed elsewhere.
 private struct LowPowerButton: View {
     @ObservedObject var battery: BatteryService
 
     var body: some View {
-        Button { battery.openLowPowerSettings() } label: {
-            Label(battery.isLowPowerMode ? "Low Power On" : "Low Power Mode",
-                  systemImage: battery.isLowPowerMode ? "checkmark" : "leaf.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(.yellow))
-                .shadow(color: .yellow.opacity(0.4), radius: 6)
+        let isOn = battery.isLowPowerMode
+        Button { battery.setLowPowerMode(!isOn) } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "leaf.fill")
+                    .foregroundStyle(isOn ? .black : .yellow)
+                Text("Low Power")
+                    .foregroundStyle(isOn ? .black : .white)
+                // A small switch knob, like iOS's toggle.
+                Capsule()
+                    .fill(isOn ? .black.opacity(0.25) : .white.opacity(0.2))
+                    .frame(width: 26, height: 15)
+                    .overlay(alignment: isOn ? .trailing : .leading) {
+                        Circle().fill(isOn ? .black : .white).padding(2)
+                    }
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .padding(.leading, 12)
+            .padding(.trailing, 8)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(isOn ? Color.yellow : Color.white.opacity(0.14)))
+            .shadow(color: .yellow.opacity(isOn ? 0.4 : 0), radius: 6)
+            .animation(.spring(duration: 0.3, bounce: 0.25), value: isOn)
         }
         .buttonStyle(PressScaleStyle())
-        .disabled(battery.isLowPowerMode)
-        .help("Opens Battery settings, where Low Power Mode is one toggle")
+        .help(Preferences.isDirectEdition ? "Turn Low Power Mode on or off" : "Opens Battery settings")
     }
 }
 

@@ -72,8 +72,25 @@ final class BatteryService: ObservableObject {
 }
 
 extension BatteryService {
-    /// macOS has no public API for apps to switch Low Power Mode on, so this opens Battery
-    /// settings, where it is a single toggle.
+    /// Turns Low Power Mode on or off. There's no public API for it: the direct edition runs
+    /// `pmset`, which macOS only allows an administrator to do, so it asks for a password or
+    /// Touch ID each time. The App Store edition can't, so it opens Battery settings instead.
+    func setLowPowerMode(_ on: Bool) {
+        #if DIRECT_DISTRIBUTION
+        DispatchQueue.global(qos: .userInitiated).async {
+            let script = "do shell script \"/usr/bin/pmset -a lowpowermode \(on ? 1 : 0)\" with administrator privileges"
+            var error: NSDictionary?
+            NSAppleScript(source: script)?.executeAndReturnError(&error)
+            // Cancelling the password prompt is fine; anything else is worth a log line.
+            if let error, (error[NSAppleScript.errorNumber] as? Int) != -128 {
+                NSLog("NotchIsland: couldn't change Low Power Mode: %@", error)
+            }
+        }
+        #else
+        openLowPowerSettings()
+        #endif
+    }
+
     func openLowPowerSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") {
             NSWorkspace.shared.open(url)

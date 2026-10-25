@@ -81,6 +81,8 @@ final class NotchViewModel: ObservableObject {
     private var activityDismissal: DispatchWorkItem?
     private var earsDismissal: DispatchWorkItem?
     private var earsHideAt: Date?
+    /// Brightness changes before this come from macOS (power changes), so they aren't shown.
+    private var brightnessQuietUntil = Date.distantPast
     private let launchedAt = Date()
 
     init(media: MediaController, battery: BatteryService, calendar: CalendarService,
@@ -122,15 +124,23 @@ final class NotchViewModel: ObservableObject {
         // The collapsed size depends on media state, so re-render when it changes.
         media.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
 
-        battery.onEvent = { [weak self] event in
+        battery.onEvent = { [weak self, weak battery] event in
+            guard let self else { return }
+            // macOS dims the screen itself on power changes; that isn't the user's doing.
+            brightnessQuietUntil = Date().addingTimeInterval(3)
             switch event {
-            case .pluggedIn: self?.show(.charging)
-            case .unplugged: self?.show(.unplugged)
-            case .fullyCharged: self?.show(.fullyCharged)
-            // Longer, so there's time to reach the Low Power Mode button.
-            case .low: self?.show(.lowBattery, for: 8)
+            case .pluggedIn: show(.charging)
+            // Unplugging with little charge left offers Low Power Mode, as on iPhone.
+            case .unplugged: (battery?.level ?? 100) <= 20 ? show(.lowBattery, for: 10) : show(.unplugged)
+            case .fullyCharged: show(.fullyCharged)
+            // Longer, so there's time to reach the Low Power Mode toggle.
+            case .low: show(.lowBattery, for: 10)
             }
         }
+        // Low Power Mode dims the screen too.
+        battery.$isLowPowerMode.dropFirst().removeDuplicates()
+            .sink { [weak self] _ in self?.brightnessQuietUntil = Date().addingTimeInterval(3) }
+            .store(in: &cancellables)
 
         // Pop up when a new track starts, but not for whatever was already playing at launch.
         media.$current
@@ -306,6 +316,7 @@ final class NotchViewModel: ObservableObject {
     }
 
     func showBrightness(_ level: Float) {
+        guard Date() > brightnessQuietUntil else { return }
         hudLevel = level
         hudMuted = false
         show(.brightness, for: 1.6)
@@ -326,6 +337,8 @@ final class NotchViewModel: ObservableObject {
         guard Preferences.isPopUpEnabled(activity.settingsKey) else { return }
         // A ringing timer keeps its pop-up until the user answers it.
         if self.activity == .timerDone, activity != .timerDone { return }
+        // Volume and brightness never push aside a pop-up with buttons.
+        if activityIsInteractive, activity == .volume || activity == .brightness { return }
         activityDismissal?.cancel()
         self.activity = activity
         guard let seconds else { return }
