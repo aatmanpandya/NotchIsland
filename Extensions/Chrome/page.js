@@ -34,7 +34,9 @@
   }
 
   // Muted and very short clips are previews, GIFs and ads, not something the user is watching.
+  // Live call streams (Meet, Zoom, Teams, Discord, webcam previews) aren't media playback either.
   function isReal(el) {
+    if (el.srcObject instanceof MediaStream) return false;
     return !el.muted && el.volume > 0 && (!isFinite(el.duration) || el.duration >= 10);
   }
 

@@ -42,6 +42,8 @@ final class BrowserBridgeSource: MediaSource {
     private var listener: NWListener?
     private var browsers: [ObjectIdentifier: Browser] = [:]
     private var selected: (browser: ObjectIdentifier, tabId: Int)?
+    /// When each playing tab started playing, so two playing tabs don't trade places on every update.
+    private var playingSince: [String: Date] = [:]
     private var artworkCache: [String: NSImage] = [:]
     private var artworkLoading: Set<String> = []
 
@@ -128,10 +130,21 @@ final class BrowserBridgeSource: MediaSource {
 
     // MARK: - Snapshot
 
-    /// The most recently updated playing tab wins; otherwise keep showing the last one.
+    /// The tab that most recently *started* playing wins; otherwise keep showing the last one.
     private func recompute() {
         let all = browsers.flatMap { key, browser in browser.tabs.map { (key, browser.name, $0) } }
-        let pick = all.filter { $0.2.playing }.max { $0.2.updatedAt < $1.2.updatedAt }
+
+        let now = Date()
+        var since: [String: Date] = [:]
+        for (key, _, tab) in all where tab.playing {
+            let id = Self.tabKey(key, tab.tabId)
+            since[id] = playingSince[id] ?? now
+        }
+        playingSince = since
+
+        let pick = all.filter { $0.2.playing }.max { a, b in
+            since[Self.tabKey(a.0, a.2.tabId)]! < since[Self.tabKey(b.0, b.2.tabId)]!
+        }
             ?? all.first { $0.0 == selected?.browser && $0.2.tabId == selected?.tabId }
             ?? all.max { $0.2.updatedAt < $1.2.updatedAt }
 
@@ -158,6 +171,10 @@ final class BrowserBridgeSource: MediaSource {
             canSeek: tab.canSeek,
             canSkip: tab.canSkip
         )
+    }
+
+    private static func tabKey(_ browser: ObjectIdentifier, _ tabId: Int) -> String {
+        "\(browser.hashValue)-\(tabId)"
     }
 
     private func loadArtwork(_ urlString: String) {
