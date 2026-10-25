@@ -17,9 +17,11 @@ final class NotchPanel: NSPanel {
         acceptsMouseMovedEvents = true
         ignoresMouseEvents = true
         isReleasedWhenClosed = false
+        // Clicks don't steal focus from other apps, except on a text field (the timer label).
+        becomesKeyOnlyIfNeeded = true
     }
 
-    override var canBecomeKey: Bool { false }
+    override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
 
@@ -57,7 +59,8 @@ final class NotchController {
         #endif
         let media = MediaController(sources: sources)
         viewModel = NotchViewModel(media: media, battery: BatteryService(), calendar: CalendarService(),
-                                   timer: TimerService(), bluetooth: BluetoothService(), shelf: ShelfService())
+                                   timer: TimerService(), stopwatch: StopwatchService(),
+                                   bluetooth: BluetoothService(), shelf: ShelfService())
         browser.onCallStarted = { [weak viewModel] site in viewModel?.callStarted(site: site) }
 
         let host = FirstMouseHostingView(rootView: NotchView(vm: viewModel))

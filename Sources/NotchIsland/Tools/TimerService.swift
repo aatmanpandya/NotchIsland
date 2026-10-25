@@ -8,19 +8,45 @@ final class TimerService: ObservableObject {
     @Published private(set) var pausedRemaining: TimeInterval?
     /// The length the timer was set to, for the progress ring.
     @Published private(set) var duration: TimeInterval = 0
+    /// Shown while it runs and when it finishes, like the iPhone's timer label.
+    @Published var label: String {
+        didSet { UserDefaults.standard.set(label, forKey: Key.label) }
+    }
+    /// One of the Mac's alert sounds (`sounds`).
+    @Published var soundName: String {
+        didSet { UserDefaults.standard.set(soundName, forKey: Key.sound) }
+    }
 
     var onFinish: (() -> Void)?
+
+    /// The alert sounds that come with macOS.
+    static let sounds: [String] = {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: "/System/Library/Sounds")) ?? []
+        let found = names.filter { $0.hasSuffix(".aiff") }.map { String($0.dropLast(5)) }.sorted()
+        return found.isEmpty ? ["Glass"] : found
+    }()
 
     private enum Key {
         static let end = "timer.end"
         static let paused = "timer.paused"
         static let duration = "timer.duration"
+        static let label = "timer.label"
+        static let sound = "timer.sound"
     }
 
     private var finishTimer: Timer?
 
     init() {
+        label = UserDefaults.standard.string(forKey: Key.label) ?? ""
+        soundName = UserDefaults.standard.string(forKey: Key.sound) ?? "Glass"
         restore()
+    }
+
+    /// The label to show, falling back to "Timer" when none is set.
+    var displayLabel: String { label.trimmingCharacters(in: .whitespaces).isEmpty ? "Timer" : label }
+
+    func previewSound(_ name: String) {
+        NSSound(named: name)?.play()
     }
 
     var isActive: Bool { endDate != nil || pausedRemaining != nil }
@@ -94,7 +120,7 @@ final class TimerService: ObservableObject {
 
     private func finish() {
         cancel()
-        NSSound(named: "Glass")?.play()
+        NSSound(named: soundName)?.play()
         onFinish?()
     }
 

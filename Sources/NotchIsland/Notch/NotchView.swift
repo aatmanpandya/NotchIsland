@@ -78,7 +78,7 @@ struct NotchView: View {
         .animation(style.shape, value: mode)
         .overlay(alignment: .topTrailing) {
             if mode == .collapsed, vm.showsTimerBubble {
-                TimerBubble(timer: vm.timer, size: vm.notchSize.height)
+                TimerBubble(timer: vm.timer, stopwatch: vm.stopwatch, size: vm.notchSize.height)
                     .offset(x: vm.notchSize.height + 6)
                     .transition(.scale(scale: 0.3, anchor: .leading).combined(with: .opacity))
                     .onTapGesture {
@@ -221,6 +221,10 @@ private struct CollapsedView: View {
                 TimerTicker(timer: vm.timer, showsTime: false)
                     .frame(width: vm.earWidth)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
+            case .stopwatch:
+                StopwatchTicker(stopwatch: vm.stopwatch, showsTime: false)
+                    .frame(width: vm.earWidth)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
             case .none:
                 EmptyView()
             }
@@ -233,6 +237,10 @@ private struct CollapsedView: View {
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
             case .timer:
                 TimerTicker(timer: vm.timer, showsTime: true)
+                    .frame(width: vm.earWidth)
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+            case .stopwatch:
+                StopwatchTicker(stopwatch: vm.stopwatch, showsTime: true)
                     .frame(width: vm.earWidth)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
             case .none:
@@ -276,7 +284,7 @@ private struct ExpandedView: View {
                 case .shelf:
                     ShelfPanel(shelf: vm.shelf, isTargeted: isDropTargeted)
                 case .tools:
-                    ToolsPanel(timer: vm.timer)
+                    ToolsPanel(timer: vm.timer, stopwatch: vm.stopwatch)
                 }
             }
             .id(vm.tab)

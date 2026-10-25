@@ -123,7 +123,7 @@ struct ActivityView: View {
                 .frame(width: 40, height: 40)
                 .background(Circle().fill(accent.opacity(0.18)))
                 .symbolEffect(.pulse)
-            titles("Time's up", "Timer finished")
+            titles("Time's up", vm.timer.displayLabel)
             Spacer(minLength: 0)
             HStack(spacing: 8) {
                 PopUpButton(title: "+1 min", tint: .white.opacity(0.16), foreground: .white) {

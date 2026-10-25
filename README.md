@@ -4,7 +4,7 @@ A Dynamic Island–style companion for the MacBook notch. Hover the notch to exp
 
 ## Status
 
-Prototype (v0.7). Working:
+Prototype (v0.8). Working:
 
 - Notch overlay that expands on hover with a spring animation
 - Liquid Glass design (macOS 26+): solid black where it meets the notch, fading into dark glass with the artwork's color glowing through; frosted blur on macOS 14–15
@@ -15,8 +15,10 @@ Prototype (v0.7). Working:
 - Pop-ups: charging (with time to full), unplugged (with time left), fully charged, low battery at 20% and 10% with a Low Power Mode button, and new track
 - Up next: your next calendar event with a countdown and a Join button for Meet, Zoom, Teams and other call links; a reminder pop-up 5 minutes before each meeting
 - Call-started pop-up for browser video calls
-- Tabs in the expanded island: Home (player and Up next) and Tools
-- Timer (Tools tab): quick 1/5/10/25-minute timers that live in the ears, or in a separate bubble while music plays; chime and a +1 min / Dismiss pop-up when done; survives restarts
+- Tabs in the expanded island: Home (player and Up next), Shelf, and Tools
+- File shelf: drag files toward the notch to park them; kept as links (no extra disk space) until cleared; drag out, open, Show in Finder, AirDrop
+- Timer (Tools tab, iPhone Clock layout): scroll wheels, cancel and start, a label and an alert sound; lives in the ears or in a separate bubble while music plays; +1 min / Dismiss pop-up when done; survives restarts
+- Stopwatch (Tools tab, next to the timer): laps, and it shows in the ears while running
 - Camera mirror (Tools tab): the camera runs only while the preview is showing
 - Bluetooth pop-up when AirPods or other devices connect; battery level in the direct edition
 - Settings window (right-click the island, or open the app again from Finder): open at login, animation, album-art timing, haptics, each media source, each pop-up, meeting reminder timing, calendar access
@@ -42,7 +44,7 @@ The direct edition's system-wide source uses the private MediaRemote framework. 
 
 The first time it reads Music or Spotify, macOS asks for Automation permission.
 
-Building with Xcode's toolchain (macOS 26 SDK or later) enables real Liquid Glass. To hold the island in one state for design work, launch it with a preview state: `expanded`, `upnext` (expanded with sample meetings), `charging`, `unplugged`, `full`, `low`, `nowplaying`, `call`, `meeting`, `tools`, `timer`, `timerdone` or `device`.
+Building with Xcode's toolchain (macOS 26 SDK or later) enables real Liquid Glass. To hold the island in one state for design work, launch it with a preview state: `expanded`, `upnext` (expanded with sample meetings), `charging`, `unplugged`, `full`, `low`, `nowplaying`, `call`, `meeting`, `tools`, `timer`, `timerdone`, `device`, `shelf` (sample files, not saved) or `dropzone`.
 
 ```bash
 open --env NOTCHISLAND_PREVIEW=expanded build/NotchIsland.app
@@ -64,7 +66,8 @@ The extension talks to the app over a WebSocket on `127.0.0.1:47823`. The app on
 - `Extensions/Chrome/`: Manifest V3 extension. `page.js` reads the page's media session and players, `relay.js` forwards to `background.js`, which holds the socket to the app
 - `Calendar/`: `CalendarService` (EventKit; asks for access only when the user taps the button) and the Up next views
 - `Widgets/`: media and battery views, and the battery service
-- `Tools/`: the timer service and the Tools tab (timer and camera mirror)
+- `Tools/`: timer and stopwatch services, and the Tools tab (timer, stopwatch, camera mirror)
+- `Shelf/`: the shelf service (bookmarks) and the Shelf tab
 - `Devices/`: Bluetooth connection alerts
 - `Settings/`: the Settings window, onboarding, and `AppWindows`, which opens them
 - `App/Preferences.swift`: every setting's key and default

@@ -26,6 +26,7 @@ final class NotchViewModel: ObservableObject {
         case none
         case media
         case timer
+        case stopwatch
     }
 
     /// Briefly opens the island so a new user sees where it lives.
@@ -65,6 +66,7 @@ final class NotchViewModel: ObservableObject {
     let battery: BatteryService
     let calendar: CalendarService
     let timer: TimerService
+    let stopwatch: StopwatchService
     let bluetooth: BluetoothService
     let shelf: ShelfService
     let expandedSize = CGSize(width: 640, height: 210)
@@ -76,15 +78,17 @@ final class NotchViewModel: ObservableObject {
     private let launchedAt = Date()
 
     init(media: MediaController, battery: BatteryService, calendar: CalendarService,
-         timer: TimerService, bluetooth: BluetoothService, shelf: ShelfService) {
+         timer: TimerService, stopwatch: StopwatchService, bluetooth: BluetoothService, shelf: ShelfService) {
         self.media = media
         self.battery = battery
         self.calendar = calendar
         self.timer = timer
+        self.stopwatch = stopwatch
         self.bluetooth = bluetooth
         self.shelf = shelf
         timer.onFinish = { [weak self] in self?.show(.timerDone, for: 12) }
         timer.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        stopwatch.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         bluetooth.onConnect = { [weak self] device in
             self?.connectedDevice = device
             self?.show(.deviceConnected, for: 4)
@@ -139,14 +143,15 @@ final class NotchViewModel: ObservableObject {
     /// The island grows "ears" beside the notch for a few seconds when playback starts.
     var showsEars: Bool { earsRevealed && media.current?.isPlaying == true }
 
-    /// Music gets the ears first; a running timer takes them when nothing else needs them.
+    /// Music gets the ears first, then a timer, then a running stopwatch.
     var ears: Ears {
         if showsEars { return .media }
-        return timer.isActive ? .timer : .none
+        if timer.isActive { return .timer }
+        return stopwatch.isRunning ? .stopwatch : .none
     }
 
-    /// With music in the ears, a timer splits off into its own bubble, as on iPhone.
-    var showsTimerBubble: Bool { ears == .media && timer.isActive }
+    /// With music in the ears, a timer or stopwatch splits off into its own bubble, as on iPhone.
+    var showsTimerBubble: Bool { ears == .media && (timer.isActive || stopwatch.isRunning) }
     var earWidth: CGFloat { notchSize.height + 12 }
 
     func topRadius(for mode: Mode) -> CGFloat {
