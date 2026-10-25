@@ -45,6 +45,13 @@ final class NotchController {
     private var dragChangeCount = 0
     private var isDraggingFile = false
 
+    private let volume = VolumeService()
+    #if DIRECT_DISTRIBUTION
+    private let brightness = BrightnessService()
+    private let mediaKeys = MediaKeyTap()
+    private var trustCheck: Timer?
+    #endif
+
     init() {
         // Order is priority when several are playing: the dedicated sources give richer
         // controls, and the system-wide source covers every other app.
@@ -86,6 +93,18 @@ final class NotchController {
         if let preview = ProcessInfo.processInfo.environment["NOTCHISLAND_PREVIEW"]?.lowercased() {
             isPinned = viewModel.pinForPreview(preview)
         }
+
+        volume.onChange = { [weak viewModel] reading in
+            viewModel?.showVolume(level: reading.level, muted: reading.isMuted, device: reading.deviceName)
+        }
+        #if DIRECT_DISTRIBUTION
+        brightness.onChange = { [weak viewModel] level in viewModel?.showBrightness(level) }
+        mediaKeys.onKey = { [weak self] key, fine in self?.handleMediaKey(key, fine: fine) }
+        updateKeyTakeover()
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.updateKeyTakeover() }
+        #endif
 
         AppWindows.shared.calendar = viewModel.calendar
         AppWindows.shared.onOnboardingFinished = { [weak viewModel] in viewModel?.demo() }
@@ -175,6 +194,46 @@ final class NotchController {
         pendingToggle = work
         DispatchQueue.main.asyncAfter(deadline: .now() + (inside ? 0.1 : 0.25), execute: work)
     }
+
+    #if DIRECT_DISTRIBUTION
+    /// Takes over the volume and brightness keys while the setting is on. macOS needs
+    /// Accessibility permission for that; until it's granted, ask once and keep checking.
+    private func updateKeyTakeover() {
+        let wanted = UserDefaults.standard.bool(forKey: Preferences.Key.replaceSystemHUD)
+        guard wanted else {
+            mediaKeys.stop()
+            trustCheck?.invalidate()
+            trustCheck = nil
+            return
+        }
+        if mediaKeys.start() { return }
+        guard trustCheck == nil else { return }
+        MediaKeyTap.requestTrust()
+        trustCheck = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+            guard let self, MediaKeyTap.isTrusted else { return }
+            timer.invalidate()
+            trustCheck = nil
+            mediaKeys.start()
+        }
+    }
+
+    /// The same steps as macOS: a sixteenth per press, a quarter of that with Option-Shift.
+    private func handleMediaKey(_ key: MediaKeyTap.Key, fine: Bool) {
+        let step: Float = fine ? 1 / 64 : 1 / 16
+        switch key {
+        case .volumeUp, .volumeDown, .mute:
+            if key == .mute { volume.toggleMute() } else { volume.adjust(by: key == .volumeUp ? step : -step) }
+            // Shown here too, so a press at 0% or 100% (no change to report) still shows the bar.
+            if let reading = volume.current {
+                viewModel.showVolume(level: reading.level, muted: reading.isMuted, device: reading.deviceName)
+            }
+        case .brightnessUp:
+            brightness.adjust(by: step)
+        case .brightnessDown:
+            brightness.adjust(by: -step)
+        }
+    }
+    #endif
 
     private func setExpanded(_ expanded: Bool) {
         guard viewModel.isExpanded != expanded else { return }

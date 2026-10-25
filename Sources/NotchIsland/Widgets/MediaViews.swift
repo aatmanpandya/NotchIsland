@@ -200,9 +200,26 @@ struct AudioBars: View {
     let color: Color
     var height: CGFloat = 14
 
+    @ObservedObject private var spectrum = LiveSpectrum.shared
     private let speeds: [Double] = [5.1, 6.7, 4.3, 7.4]
 
     var body: some View {
+        if let bands = spectrum.bands, isPlaying {
+            HStack(spacing: 2) {
+                ForEach(bands.indices, id: \.self) { i in
+                    Capsule()
+                        .fill(LinearGradient(colors: [color, color.opacity(0.6)], startPoint: .top, endPoint: .bottom))
+                        .frame(width: height / 4.5, height: height * CGFloat(0.15 + 0.85 * bands[i]))
+                }
+            }
+            .frame(height: height)
+            .animation(.linear(duration: 0.08), value: bands)
+        } else {
+            decorative
+        }
+    }
+
+    private var decorative: some View {
         TimelineView(.animation(minimumInterval: 1 / 30, paused: !isPlaying)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(spacing: 2) {

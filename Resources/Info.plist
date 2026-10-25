@@ -30,6 +30,8 @@
 	<string>NotchIsland shows a quick mirror in the notch so you can check how you look before a call. Nothing is recorded.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>NotchIsland shows a pop-up when your AirPods or other Bluetooth devices connect.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>The live visualizer listens to what your Mac is playing so the bars move with the music. Sound is analyzed on your Mac and never recorded or saved.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>NotchIsland reads what's playing in Music and Spotify and lets you control playback from the notch.</string>
 </dict>

@@ -25,6 +25,7 @@ private struct GeneralSettings: View {
     @AppStorage(IslandMotion.styleKey) private var style: MotionStyle = .ios
     @AppStorage(Preferences.Key.earsLinger) private var earsLinger = 5
     @AppStorage(Preferences.Key.haptics) private var haptics = true
+    @AppStorage(Preferences.Key.liveVisualizer) private var liveVisualizer = false
 
     var body: some View {
         Form {
@@ -43,6 +44,11 @@ private struct GeneralSettings: View {
                     Text("The whole time it plays").tag(-1)
                 }
                 Toggle("Haptic feedback when it opens", isOn: $haptics)
+            }
+            Section {
+                Toggle("Live visualizer", isOn: $liveVisualizer)
+            } footer: {
+                Text("The bars move with the actual audio. macOS asks once for permission to listen to system audio. Sound is analyzed on your Mac and never recorded or saved.")
             }
         }
         .formStyle(.grouped)
@@ -158,12 +164,38 @@ private struct PopUpSettings: View {
                 .disabled(!meeting)
                 CalendarAccessRow(calendar: calendar)
             }
+            VolumeBrightnessSettings()
             Section("Devices and timer") {
                 Toggle("A Bluetooth device connects", isOn: $device)
                 Toggle("A timer finishes", isOn: $timerDone)
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct VolumeBrightnessSettings: View {
+    @AppStorage(Preferences.Key.popUp("volume")) private var volume = Preferences.isDirectEdition
+    @AppStorage(Preferences.Key.popUp("brightness")) private var brightness = Preferences.isDirectEdition
+    @AppStorage(Preferences.Key.replaceSystemHUD) private var replaceSystem = false
+
+    var body: some View {
+        Section {
+            Toggle("Volume", isOn: $volume)
+            #if DIRECT_DISTRIBUTION
+            Toggle("Brightness", isOn: $brightness)
+            Toggle("Hide the system pop-up", isOn: $replaceSystem)
+                .disabled(!volume && !brightness)
+            #endif
+        } header: {
+            Text("Volume and brightness")
+        } footer: {
+            #if DIRECT_DISTRIBUTION
+            Text("Hiding the system pop-up lets NotchIsland handle the volume and brightness keys itself. macOS asks for Accessibility permission to allow it.")
+            #else
+            Text("macOS still shows its own volume pop-up as well.")
+            #endif
+        }
     }
 }
 

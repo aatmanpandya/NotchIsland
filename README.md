@@ -4,7 +4,7 @@ A Dynamic Island–style companion for the MacBook notch. Hover the notch to exp
 
 ## Status
 
-Prototype (v0.8). Working:
+Prototype (v0.9). Working:
 
 - Notch overlay that expands on hover with a spring animation
 - Liquid Glass design (macOS 26+): solid black where it meets the notch, fading into dark glass with the artwork's color glowing through; frosted blur on macOS 14–15
@@ -21,6 +21,8 @@ Prototype (v0.8). Working:
 - Stopwatch (Tools tab, next to the timer): laps, and it shows in the ears while running
 - Camera mirror (Tools tab): the camera runs only while the preview is showing
 - Bluetooth pop-up when AirPods or other devices connect; battery level in the direct edition
+- Volume pop-up (public Core Audio; off by default in the App Store edition, since macOS still shows its own) and, in the direct edition, brightness plus an option to take over the keys so the system pop-up never appears (needs Accessibility)
+- Opt-in live visualizer: a Core Audio process tap and an FFT (Accelerate) drive the bars from the actual audio; nothing is recorded
 - Settings window (right-click the island, or open the app again from Finder): open at login, animation, album-art timing, haptics, each media source, each pop-up, meeting reminder timing, calendar access
 - First-run onboarding: welcome, media and the browser extension, calendar access, open at login
 
@@ -44,7 +46,7 @@ The direct edition's system-wide source uses the private MediaRemote framework. 
 
 The first time it reads Music or Spotify, macOS asks for Automation permission.
 
-Building with Xcode's toolchain (macOS 26 SDK or later) enables real Liquid Glass. To hold the island in one state for design work, launch it with a preview state: `expanded`, `upnext` (expanded with sample meetings), `charging`, `unplugged`, `full`, `low`, `nowplaying`, `call`, `meeting`, `tools`, `timer`, `timerdone`, `device`, `shelf` (sample files, not saved) or `dropzone`.
+Building with Xcode's toolchain (macOS 26 SDK or later) enables real Liquid Glass. To hold the island in one state for design work, launch it with a preview state: `expanded`, `upnext` (expanded with sample meetings), `charging`, `unplugged`, `full`, `low`, `nowplaying`, `call`, `meeting`, `tools`, `timer`, `timerdone`, `device`, `shelf` (sample files, not saved), `dropzone`, `volume` or `brightness`.
 
 ```bash
 open --env NOTCHISLAND_PREVIEW=expanded build/NotchIsland.app
@@ -68,7 +70,8 @@ The extension talks to the app over a WebSocket on `127.0.0.1:47823`. The app on
 - `Widgets/`: media and battery views, and the battery service
 - `Tools/`: timer and stopwatch services, and the Tools tab (timer, stopwatch, camera mirror)
 - `Shelf/`: the shelf service (bookmarks) and the Shelf tab
-- `Devices/`: Bluetooth connection alerts
+- `Devices/`: Bluetooth alerts, volume (Core Audio), brightness and media-key takeover (direct edition only)
+- `Media/LiveSpectrum.swift`: the live visualizer (system audio tap, FFT, four bands with automatic gain)
 - `Settings/`: the Settings window, onboarding, and `AppWindows`, which opens them
 - `App/Preferences.swift`: every setting's key and default
 

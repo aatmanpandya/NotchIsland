@@ -13,6 +13,8 @@ final class NotchViewModel: ObservableObject {
         case meetingSoon
         case timerDone
         case deviceConnected
+        case volume
+        case brightness
     }
 
     enum Tab: CaseIterable {
@@ -53,6 +55,10 @@ final class NotchViewModel: ObservableObject {
     @Published var tab: Tab = .home
     /// The device announced by the most recent connection pop-up.
     @Published private(set) var connectedDevice: BluetoothService.Device?
+    /// The level shown by the volume or brightness pop-up (0...1).
+    @Published private(set) var hudLevel: Float = 0
+    @Published private(set) var hudMuted = false
+    @Published private(set) var hudDevice = ""
     @Published private(set) var notchSize = CGSize(width: 185, height: 32)
     @Published private(set) var activity: Activity?
     /// The call announced by the most recent call pop-up.
@@ -89,6 +95,21 @@ final class NotchViewModel: ObservableObject {
         timer.onFinish = { [weak self] in self?.show(.timerDone, for: 12) }
         timer.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         stopwatch.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+
+        // The live visualizer listens only while it's switched on and something is playing.
+        media.$current.map { $0?.isPlaying == true }.removeDuplicates()
+            .sink { playing in
+                LiveSpectrum.shared.update(enabled: UserDefaults.standard.bool(forKey: Preferences.Key.liveVisualizer),
+                                           isPlaying: playing)
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                LiveSpectrum.shared.update(enabled: UserDefaults.standard.bool(forKey: Preferences.Key.liveVisualizer),
+                                           isPlaying: self?.media.current?.isPlaying == true)
+            }
+            .store(in: &cancellables)
         bluetooth.onConnect = { [weak self] device in
             self?.connectedDevice = device
             self?.show(.deviceConnected, for: 4)
@@ -207,7 +228,7 @@ final class NotchViewModel: ObservableObject {
         let activities: [String: Activity] = [
             "charging": .charging, "unplugged": .unplugged, "full": .fullyCharged,
             "low": .lowBattery, "nowplaying": .nowPlaying, "call": .call, "meeting": .meetingSoon,
-            "timerdone": .timerDone, "device": .deviceConnected,
+            "timerdone": .timerDone, "device": .deviceConnected, "volume": .volume, "brightness": .brightness,
         ]
         if name == "expanded" {
             isExpanded = true
@@ -236,6 +257,10 @@ final class NotchViewModel: ObservableObject {
             if pinned == .call { call = CallInfo(site: "Google Meet", startedAt: Date().addingTimeInterval(-75)) }
             if pinned == .deviceConnected {
                 connectedDevice = BluetoothService.Device(name: "AirPods Pro", symbol: "airpodspro", batteryPercent: 82)
+            }
+            if pinned == .volume || pinned == .brightness {
+                hudLevel = 0.62
+                hudDevice = "MacBook Pro Speakers"
             }
             if pinned == .meetingSoon {
                 calendar.useSampleMeetings()
@@ -271,6 +296,20 @@ final class NotchViewModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
     }
 
+    /// Repeated presses keep the same pop-up open and just move its bar.
+    func showVolume(level: Float, muted: Bool, device: String) {
+        hudLevel = level
+        hudMuted = muted
+        hudDevice = device
+        show(.volume, for: 1.6)
+    }
+
+    func showBrightness(_ level: Float) {
+        hudLevel = level
+        hudMuted = false
+        show(.brightness, for: 1.6)
+    }
+
     func dismissActivity() {
         activityDismissal?.cancel()
         activity = nil
@@ -299,6 +338,8 @@ extension NotchViewModel.Activity {
         case .meetingSoon: "meetingSoon"
         case .timerDone: "timerDone"
         case .deviceConnected: "deviceConnected"
+        case .volume: "volume"
+        case .brightness: "brightness"
         }
     }
 }

@@ -11,6 +11,8 @@ extension NotchViewModel.Activity {
         case .meetingSoon: vm.soonMeeting?.color ?? .blue
         case .timerDone: .orange
         case .deviceConnected: .blue
+        case .volume: .white
+        case .brightness: .yellow
         }
     }
 }
@@ -28,7 +30,7 @@ struct ActivityView: View {
             // artwork and bars below aren't shown twice.
             HStack {
                 switch activity {
-                case .nowPlaying:
+                case .nowPlaying, .volume, .brightness:
                     EmptyView()
                 case .call:
                     Image(systemName: "video.fill").foregroundStyle(accent)
@@ -78,7 +80,7 @@ struct ActivityView: View {
         case .charging, .fullyCharged: Image(systemName: "bolt.fill").symbolEffect(.pulse)
         case .unplugged: Image(systemName: "powerplug.fill")
         case .lowBattery: Image(systemName: "exclamationmark.triangle.fill")
-        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected: EmptyView()
+        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected, .volume, .brightness: EmptyView()
         }
     }
 
@@ -132,6 +134,8 @@ struct ActivityView: View {
                 }
                 PopUpButton(title: "Dismiss", tint: accent, foreground: .black) { vm.dismissActivity() }
             }
+        case .volume, .brightness:
+            LevelPopUp(kind: activity, level: vm.hudLevel, muted: vm.hudMuted, device: vm.hudDevice, accent: accent)
         case .deviceConnected:
             let device = vm.connectedDevice
             Image(systemName: device?.symbol ?? "dot.radiowaves.left.and.right")
@@ -173,7 +177,7 @@ struct ActivityView: View {
         case .unplugged: "On Battery"
         case .fullyCharged: "Fully Charged"
         case .lowBattery: "Low Battery"
-        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected: ""
+        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected, .volume, .brightness: ""
         }
     }
 
@@ -184,8 +188,55 @@ struct ActivityView: View {
         case .unplugged: return battery.minutesToEmpty.map { "About \($0.durationText) left" } ?? "Power adapter disconnected"
         case .fullyCharged: return "You can unplug now"
         case .lowBattery: return "\(battery.level)% remaining"
-        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected: return ""
+        case .nowPlaying, .call, .meetingSoon, .timerDone, .deviceConnected, .volume, .brightness: return ""
         }
+    }
+}
+
+/// Volume or brightness: an icon, a bar that follows each press, and the percentage.
+private struct LevelPopUp: View {
+    let kind: NotchViewModel.Activity
+    let level: Float
+    let muted: Bool
+    let device: String
+    let accent: Color
+
+    var body: some View {
+        let shown = muted ? 0 : CGFloat(level)
+        Image(systemName: symbol)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(accent)
+            .contentTransition(.symbolEffect(.replace))
+            .frame(width: 28)
+        VStack(alignment: .leading, spacing: 5) {
+            if kind == .volume, !device.isEmpty {
+                Text(device)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.15))
+                    Capsule().fill(accent).frame(width: max(6, geo.size.width * shown))
+                }
+            }
+            .frame(height: 6)
+        }
+        .animation(.spring(duration: 0.25, bounce: 0.1), value: shown)
+        Text(muted ? "Muted" : "\(Int((level * 100).rounded()))%")
+            .font(.system(size: 13, weight: .semibold).monospacedDigit())
+            .frame(width: 50, alignment: .trailing)
+    }
+
+    private var symbol: String {
+        if kind == .brightness { return level < 0.5 ? "sun.min.fill" : "sun.max.fill" }
+        if muted || level == 0 { return "speaker.slash.fill" }
+        let lowered = device.lowercased()
+        if lowered.contains("airpods max") { return "airpodsmax" }
+        if lowered.contains("airpods pro") { return "airpodspro" }
+        if lowered.contains("airpods") { return "airpods" }
+        return level < 0.34 ? "speaker.wave.1.fill" : level < 0.67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill"
     }
 }
 
