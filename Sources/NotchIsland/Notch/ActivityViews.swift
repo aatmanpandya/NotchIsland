@@ -49,6 +49,7 @@ struct ActivityView: View {
             .padding(.bottom, 6)
         }
         .foregroundStyle(.white)
+        .shadow(color: .black.opacity(0.4), radius: 3, y: 1)
     }
 
     @ViewBuilder private var batteryIcon: some View {

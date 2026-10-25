@@ -12,18 +12,42 @@ enum IslandMotion {
     /// New content starts this much smaller and grows into place.
     static let contentScale: CGFloat = 0.9
 
+    // Stretch style: the island widens out of the notch first, then pours downward, and content
+    // comes into focus from a blur. Collapsing runs the same steps in reverse.
+    static let stretchWidth = Animation.spring(response: 0.32, dampingFraction: 0.8)
+    static let stretchHeight = Animation.spring(response: 0.46, dampingFraction: 0.72)
+    /// Gap between the two steps.
+    static let stretchStagger: TimeInterval = 0.07
+    static let focusBlur: CGFloat = 12
+    static let focusIn = Animation.easeOut(duration: 0.3).delay(0.12)
+
+    /// UserDefaults key for the style picked in the island's right-click menu.
+    static let styleKey = "motionStyle"
+
     // Views that carry the same ID morph into each other instead of fading.
     static let artworkID = "artwork"
     static let barsID = "bars"
 }
 
+enum MotionStyle: String, CaseIterable, Identifiable {
+    case stretch
+    case drop
+
+    var id: Self { self }
+    var title: String { self == .stretch ? "Stretch" : "Drop" }
+}
+
 struct NotchView: View {
     @ObservedObject var vm: NotchViewModel
     @Namespace private var island
+    @AppStorage(IslandMotion.styleKey) private var style: MotionStyle = .stretch
+    /// The size actually drawn in the Stretch style, animated one axis at a time.
+    @State private var stretchedSize: CGSize?
 
     var body: some View {
         let mode = vm.mode
-        let size = vm.size(for: mode)
+        let target = vm.size(for: mode)
+        let size = style == .stretch ? (stretchedSize ?? target) : target
         let shape = NotchShape(topRadius: vm.topRadius(for: mode), bottomRadius: vm.bottomRadius(for: mode))
 
         ZStack(alignment: .top) {
@@ -54,18 +78,63 @@ struct NotchView: View {
         .contextMenu { IslandMenu() }
         .animation(IslandMotion.morph, value: mode)
         .animation(IslandMotion.morph, value: vm.showsEars)
+        .onAppear { stretchedSize = target }
+        .onChange(of: target) { old, new in stretch(from: old, to: new) }
+        .onChange(of: style) { stretchedSize = target }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
     }
 
     private var contentTransition: AnyTransition {
-        .asymmetric(
-            insertion: .opacity.combined(with: .scale(scale: IslandMotion.contentScale, anchor: .top))
-                .combined(with: .offset(y: -6))
-                .animation(IslandMotion.morph.delay(IslandMotion.contentDelay)),
-            removal: .opacity.animation(IslandMotion.fadeOut)
-        )
+        switch style {
+        case .drop:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: IslandMotion.contentScale, anchor: .top))
+                    .combined(with: .offset(y: -6))
+                    .animation(IslandMotion.morph.delay(IslandMotion.contentDelay)),
+                removal: .opacity.animation(IslandMotion.fadeOut)
+            )
+        case .stretch:
+            return .asymmetric(
+                insertion: .opacity.combined(with: .focusBlur(IslandMotion.focusBlur))
+                    .animation(IslandMotion.focusIn),
+                removal: .opacity.combined(with: .focusBlur(IslandMotion.focusBlur / 2))
+                    .animation(IslandMotion.fadeOut)
+            )
+        }
+    }
+
+    /// Opening widens first and then grows down; closing pulls up first and then narrows.
+    private func stretch(from old: CGSize, to new: CGSize) {
+        guard style == .stretch else { return }
+        if stretchedSize == nil { stretchedSize = old }
+        let opening = new.height > (stretchedSize?.height ?? old.height)
+        if opening {
+            withAnimation(IslandMotion.stretchWidth) { stretchedSize?.width = new.width }
+            withAnimation(IslandMotion.stretchHeight.delay(IslandMotion.stretchStagger)) {
+                stretchedSize?.height = new.height
+            }
+        } else {
+            withAnimation(IslandMotion.stretchHeight) { stretchedSize?.height = new.height }
+            withAnimation(IslandMotion.stretchWidth.delay(IslandMotion.stretchStagger)) {
+                stretchedSize?.width = new.width
+            }
+        }
+    }
+}
+
+private struct FocusBlur: ViewModifier {
+    let radius: CGFloat
+
+    func body(content: Content) -> some View {
+        content.blur(radius: radius)
+    }
+}
+
+private extension AnyTransition {
+    static func focusBlur(_ radius: CGFloat) -> AnyTransition {
+        .modifier(active: FocusBlur(radius: radius), identity: FocusBlur(radius: 0))
     }
 }
 
@@ -76,7 +145,7 @@ private struct IslandBackground: View {
     let mode: NotchViewModel.Mode
 
     /// How far below the notch the black takes to fade out.
-    private let fadeDepth: CGFloat = 44
+    private let fadeDepth: CGFloat = 24
 
     var body: some View {
         if mode == .collapsed {
@@ -87,7 +156,7 @@ private struct IslandBackground: View {
                 let solidEnd = min(1, vm.notchSize.height / height)
                 let fadeEnd = min(1, (vm.notchSize.height + fadeDepth) / height)
                 ZStack(alignment: .leading) {
-                    Color.clear.islandGlass(in: Rectangle(), tint: .black.opacity(0.62))
+                    Color.clear.islandGlass(in: Rectangle(), tint: .black.opacity(0.18), clear: true)
                     glow
                     LinearGradient(
                         stops: [
@@ -124,7 +193,13 @@ private struct IslandBackground: View {
 }
 
 private struct IslandMenu: View {
+    @AppStorage(IslandMotion.styleKey) private var style: MotionStyle = .stretch
+
     var body: some View {
+        Picker("Animation", selection: $style) {
+            ForEach(MotionStyle.allCases) { Text($0.title).tag($0) }
+        }
+        Divider()
         let loginItem = SMAppService.mainApp
         Button(loginItem.status == .enabled ? "Don't Open at Login" : "Open at Login") {
             try? loginItem.status == .enabled ? loginItem.unregister() : loginItem.register()
@@ -192,6 +267,7 @@ private struct ExpandedView: View {
             .padding(.bottom, 22)
         }
         .foregroundStyle(.white)
+        .shadow(color: .black.opacity(0.4), radius: 3, y: 1)
     }
 }
 

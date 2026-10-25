@@ -3,10 +3,12 @@ import SwiftUI
 
 extension View {
     /// Liquid Glass on macOS 26 and later; earlier systems get a dark frosted blur.
+    /// `clear` is Apple's see-through variant: less frosting, so what's behind stays visible.
     @ViewBuilder
-    func islandGlass<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
+    func islandGlass<S: Shape>(in shape: S, tint: Color? = nil, clear: Bool = false,
+                               interactive: Bool = false) -> some View {
         if #available(macOS 26.0, *) {
-            glassEffect(makeGlass(tint: tint, interactive: interactive), in: shape)
+            glassEffect(makeGlass(tint: tint, clear: clear, interactive: interactive), in: shape)
         } else {
             background(FrostedBackground().clipShape(shape))
         }
@@ -14,8 +16,8 @@ extension View {
 }
 
 @available(macOS 26.0, *)
-private func makeGlass(tint: Color?, interactive: Bool) -> Glass {
-    var glass = Glass.regular
+private func makeGlass(tint: Color?, clear: Bool, interactive: Bool) -> Glass {
+    var glass = clear ? Glass.clear : Glass.regular
     if let tint { glass = glass.tint(tint) }
     if interactive { glass = glass.interactive() }
     return glass
