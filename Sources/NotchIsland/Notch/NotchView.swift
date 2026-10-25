@@ -3,7 +3,16 @@ import SwiftUI
 
 /// Every animation setting for the island, in one place for tuning.
 enum IslandMotion {
-    /// The shape morphing between states. Slightly underdamped, so it "plops" like the iPhone's.
+    // iOS style (default), modeled on the iPhone's Dynamic Island: a springy shape that overshoots
+    // and settles, with content that grows out of the island while coming into focus.
+    static let springy = Animation.spring(duration: 0.5, bounce: 0.3)
+    static let contentIn = springy.delay(0.04)
+    static let contentOut = Animation.spring(duration: 0.25, bounce: 0)
+    /// Content starts this small and this blurred inside the island.
+    static let emergeScale: CGFloat = 0.55
+    static let emergeBlur: CGFloat = 18
+
+    // Classic style: the original, gentler drop-in.
     static let morph = Animation.spring(response: 0.45, dampingFraction: 0.7)
     /// How long new content waits before fading in, so it lands after the shape starts growing.
     static let contentDelay: TimeInterval = 0.06
@@ -11,15 +20,6 @@ enum IslandMotion {
     static let fadeOut = Animation.easeOut(duration: 0.1)
     /// New content starts this much smaller and grows into place.
     static let contentScale: CGFloat = 0.9
-
-    // Stretch style: the island widens out of the notch first, then pours downward, and content
-    // comes into focus from a blur. Collapsing runs the same steps in reverse.
-    static let stretchWidth = Animation.spring(response: 0.32, dampingFraction: 0.8)
-    static let stretchHeight = Animation.spring(response: 0.46, dampingFraction: 0.72)
-    /// Gap between the two steps.
-    static let stretchStagger: TimeInterval = 0.07
-    static let focusBlur: CGFloat = 12
-    static let focusIn = Animation.easeOut(duration: 0.3).delay(0.12)
 
     /// UserDefaults key for the style picked in the island's right-click menu.
     static let styleKey = "motionStyle"
@@ -30,24 +30,22 @@ enum IslandMotion {
 }
 
 enum MotionStyle: String, CaseIterable, Identifiable {
-    case stretch
-    case drop
+    case ios
+    case classic
 
     var id: Self { self }
-    var title: String { self == .stretch ? "Stretch" : "Drop" }
+    var title: String { self == .ios ? "iOS" : "Classic" }
+    var shape: Animation { self == .ios ? IslandMotion.springy : IslandMotion.morph }
 }
 
 struct NotchView: View {
     @ObservedObject var vm: NotchViewModel
     @Namespace private var island
-    @AppStorage(IslandMotion.styleKey) private var style: MotionStyle = .stretch
-    /// The size actually drawn in the Stretch style, animated one axis at a time.
-    @State private var stretchedSize: CGSize?
+    @AppStorage(IslandMotion.styleKey) private var style: MotionStyle = .ios
 
     var body: some View {
         let mode = vm.mode
-        let target = vm.size(for: mode)
-        let size = style == .stretch ? (stretchedSize ?? target) : target
+        let size = vm.size(for: mode)
         let shape = NotchShape(topRadius: vm.topRadius(for: mode), bottomRadius: vm.bottomRadius(for: mode))
 
         ZStack(alignment: .top) {
@@ -73,14 +71,13 @@ struct NotchView: View {
         .frame(width: size.width, height: size.height, alignment: .top)
         .background { IslandBackground(vm: vm, mode: mode) }
         .clipShape(shape)
-        .overlay { if mode != .collapsed { GlassRim(shape: shape) } }
+        // Always present (just hidden when collapsed) so it resizes with the shape instead of
+        // appearing at the final size.
+        .overlay { GlassRim(shape: shape).opacity(mode == .collapsed ? 0 : 1) }
         .shadow(color: .black.opacity(mode == .collapsed ? 0 : 0.35), radius: 24, y: 10)
         .contextMenu { IslandMenu() }
-        .animation(IslandMotion.morph, value: mode)
-        .animation(IslandMotion.morph, value: vm.showsEars)
-        .onAppear { stretchedSize = target }
-        .onChange(of: target) { old, new in stretch(from: old, to: new) }
-        .onChange(of: style) { stretchedSize = target }
+        .animation(style.shape, value: mode)
+        .animation(style.shape, value: vm.showsEars)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
@@ -88,53 +85,42 @@ struct NotchView: View {
 
     private var contentTransition: AnyTransition {
         switch style {
-        case .drop:
+        case .ios:
+            return .asymmetric(
+                insertion: .emerge(scale: IslandMotion.emergeScale, blur: IslandMotion.emergeBlur)
+                    .animation(IslandMotion.contentIn),
+                removal: .emerge(scale: 0.75, blur: IslandMotion.emergeBlur * 0.6)
+                    .animation(IslandMotion.contentOut)
+            )
+        case .classic:
             return .asymmetric(
                 insertion: .opacity.combined(with: .scale(scale: IslandMotion.contentScale, anchor: .top))
                     .combined(with: .offset(y: -6))
                     .animation(IslandMotion.morph.delay(IslandMotion.contentDelay)),
                 removal: .opacity.animation(IslandMotion.fadeOut)
             )
-        case .stretch:
-            return .asymmetric(
-                insertion: .opacity.combined(with: .focusBlur(IslandMotion.focusBlur))
-                    .animation(IslandMotion.focusIn),
-                removal: .opacity.combined(with: .focusBlur(IslandMotion.focusBlur / 2))
-                    .animation(IslandMotion.fadeOut)
-            )
-        }
-    }
-
-    /// Opening widens first and then grows down; closing pulls up first and then narrows.
-    private func stretch(from old: CGSize, to new: CGSize) {
-        guard style == .stretch else { return }
-        if stretchedSize == nil { stretchedSize = old }
-        let opening = new.height > (stretchedSize?.height ?? old.height)
-        if opening {
-            withAnimation(IslandMotion.stretchWidth) { stretchedSize?.width = new.width }
-            withAnimation(IslandMotion.stretchHeight.delay(IslandMotion.stretchStagger)) {
-                stretchedSize?.height = new.height
-            }
-        } else {
-            withAnimation(IslandMotion.stretchHeight) { stretchedSize?.height = new.height }
-            withAnimation(IslandMotion.stretchWidth.delay(IslandMotion.stretchStagger)) {
-                stretchedSize?.width = new.width
-            }
         }
     }
 }
 
-private struct FocusBlur: ViewModifier {
-    let radius: CGFloat
+/// Small, blurred and transparent inside the island at one end; full size and sharp at the other.
+private struct Emerge: ViewModifier {
+    let scale: CGFloat
+    let blur: CGFloat
+    let opacity: Double
 
     func body(content: Content) -> some View {
-        content.blur(radius: radius)
+        content
+            .scaleEffect(scale, anchor: .top)
+            .blur(radius: blur)
+            .opacity(opacity)
     }
 }
 
 private extension AnyTransition {
-    static func focusBlur(_ radius: CGFloat) -> AnyTransition {
-        .modifier(active: FocusBlur(radius: radius), identity: FocusBlur(radius: 0))
+    static func emerge(scale: CGFloat, blur: CGFloat) -> AnyTransition {
+        .modifier(active: Emerge(scale: scale, blur: blur, opacity: 0),
+                  identity: Emerge(scale: 1, blur: 0, opacity: 1))
     }
 }
 
@@ -193,7 +179,7 @@ private struct IslandBackground: View {
 }
 
 private struct IslandMenu: View {
-    @AppStorage(IslandMotion.styleKey) private var style: MotionStyle = .stretch
+    @AppStorage(IslandMotion.styleKey) private var style: MotionStyle = .ios
 
     var body: some View {
         Picker("Animation", selection: $style) {
