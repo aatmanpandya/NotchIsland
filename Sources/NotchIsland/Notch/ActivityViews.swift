@@ -217,20 +217,21 @@ private struct SlimLevelPopUp: View {
     let earWidth: CGFloat
     let inset: CGFloat
 
-    /// Same margin from each outer edge, and the same gap from the notch, on both sides.
+    /// The icon and the slider sit the same gap from the notch; the number keeps a margin from the edge.
     private let edgeMargin: CGFloat = 12
     private let notchGap: CGFloat = 10
 
     var body: some View {
         let shown = muted ? 0 : CGFloat(level)
         HStack(spacing: 0) {
+            // The icon sits as close to the notch as the slider does on the other side.
             HStack {
+                Spacer(minLength: 0)
                 Image(systemName: LevelSymbol.name(kind: kind, level: level, muted: muted, device: device),
                       variableValue: Double(level))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(accent)
                     .rotationEffect(.degrees(kind == .brightness ? Double(level) * 45 : 0))
-                Spacer(minLength: 0)
             }
             .padding(.leading, edgeMargin)
             .padding(.trailing, notchGap)
