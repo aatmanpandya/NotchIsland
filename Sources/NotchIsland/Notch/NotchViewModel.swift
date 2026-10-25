@@ -185,11 +185,13 @@ final class NotchViewModel: ObservableObject {
     /// With music in the ears, a timer or stopwatch splits off into its own bubble, as on iPhone.
     var showsTimerBubble: Bool { ears == .media && (timer.isActive || stopwatch.isRunning) }
     var earWidth: CGFloat { notchSize.height + 12 }
+    /// Each side of the slim volume and brightness pop-up.
+    let slimEarWidth: CGFloat = 100
 
     func topRadius(for mode: Mode) -> CGFloat {
         switch mode {
         case .collapsed: 6
-        case .activity: 12
+        case .activity(let activity): activity.isSlim ? 6 : 12
         case .expanded: 18
         }
     }
@@ -197,7 +199,7 @@ final class NotchViewModel: ObservableObject {
     func bottomRadius(for mode: Mode) -> CGFloat {
         switch mode {
         case .collapsed: 12
-        case .activity: 26
+        case .activity(let activity): activity.isSlim ? 12 : 26
         case .expanded: 34
         }
     }
@@ -206,6 +208,10 @@ final class NotchViewModel: ObservableObject {
         switch mode {
         case .expanded:
             return expandedSize
+        case .activity(let activity) where activity.isSlim:
+            // Stays in the menu bar row and only widens, like an eyelid opening.
+            return CGSize(width: notchSize.width + slimEarWidth * 2 + topRadius(for: mode) * 2,
+                          height: notchSize.height)
         case .activity:
             return CGSize(width: max(400, notchSize.width + 220), height: notchSize.height + 62)
         case .collapsed:
@@ -365,4 +371,9 @@ extension NotchViewModel.Activity {
         case .brightness: "brightness"
         }
     }
+}
+
+extension NotchViewModel.Activity {
+    /// Quick level changes get a slim pop-up the height of the notch instead of a panel.
+    var isSlim: Bool { self == .volume || self == .brightness }
 }

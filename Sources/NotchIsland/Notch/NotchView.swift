@@ -46,6 +46,11 @@ struct NotchView: View {
         let mode = vm.mode
         let size = vm.size(for: mode)
         let shape = NotchShape(topRadius: vm.topRadius(for: mode), bottomRadius: vm.bottomRadius(for: mode))
+        // Collapsed, and the slim volume and brightness pop-ups, are plain black like the notch.
+        let looksLikeNotch: Bool = {
+            if case .activity(let activity) = mode { return activity.isSlim }
+            return mode == .collapsed
+        }()
 
         ZStack(alignment: .top) {
             switch mode {
@@ -72,8 +77,8 @@ struct NotchView: View {
         .clipShape(shape)
         // Always present (just hidden when collapsed) so it resizes with the shape instead of
         // appearing at the final size.
-        .overlay { GlassRim(shape: shape).opacity(mode == .collapsed ? 0 : 1) }
-        .shadow(color: .black.opacity(mode == .collapsed ? 0 : 0.35), radius: 24, y: 10)
+        .overlay { GlassRim(shape: shape).opacity(looksLikeNotch ? 0 : 1) }
+        .shadow(color: .black.opacity(looksLikeNotch ? 0 : 0.35), radius: 24, y: 10)
         .contextMenu { IslandMenu() }
         .animation(style.shape, value: mode)
         .overlay(alignment: .topTrailing) {

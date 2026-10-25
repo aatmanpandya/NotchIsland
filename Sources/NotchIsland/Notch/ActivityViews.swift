@@ -24,8 +24,18 @@ struct ActivityView: View {
     let namespace: Namespace.ID
 
     var body: some View {
+        if activity.isSlim {
+            SlimLevelPopUp(kind: activity, level: vm.hudLevel, muted: vm.hudMuted, device: vm.hudDevice,
+                           accent: activity.accent(in: vm), notchWidth: vm.notchSize.width,
+                           earWidth: vm.slimEarWidth, inset: vm.topRadius(for: .activity(activity)))
+        } else {
+            fullPopUp
+        }
+    }
+
+    private var fullPopUp: some View {
         let accent = activity.accent(in: vm)
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             // Top row, beside the hardware notch. The now-playing pop-up leaves it empty so the
             // artwork and bars below aren't shown twice.
             HStack {
@@ -138,7 +148,7 @@ struct ActivityView: View {
                 }
             }
         case .volume, .brightness:
-            LevelPopUp(kind: activity, level: vm.hudLevel, muted: vm.hudMuted, device: vm.hudDevice, accent: accent)
+            EmptyView() // drawn by SlimLevelPopUp instead
         case .deviceConnected:
             let device = vm.connectedDevice
             Image(systemName: device?.symbol ?? "dot.radiowaves.left.and.right")
@@ -196,46 +206,54 @@ struct ActivityView: View {
     }
 }
 
-/// Volume or brightness: an icon, a bar that follows each press, and the percentage.
-private struct LevelPopUp: View {
+/// Icon in the slim pop-up's left ear; slim bar and percentage in the right ear.
+private struct SlimLevelPopUp: View {
     let kind: NotchViewModel.Activity
     let level: Float
     let muted: Bool
     let device: String
     let accent: Color
+    let notchWidth: CGFloat
+    let earWidth: CGFloat
+    let inset: CGFloat
 
     var body: some View {
         let shown = muted ? 0 : CGFloat(level)
-        // One symbol whose rays or waves fill in with the level, so it changes smoothly
-        // instead of swapping icons at fixed points.
-        Image(systemName: symbol, variableValue: Double(level))
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(accent)
-            .rotationEffect(.degrees(kind == .brightness ? Double(level) * 45 : 0))
-            .frame(width: 28)
-            .animation(.spring(duration: 0.3, bounce: 0.15), value: level)
-        VStack(alignment: .leading, spacing: 5) {
-            if kind == .volume, !device.isEmpty {
-                Text(device)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .lineLimit(1)
-            }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.15))
-                    Capsule().fill(accent).frame(width: max(6, geo.size.width * shown))
+        HStack(spacing: 0) {
+            Image(systemName: LevelSymbol.name(kind: kind, level: level, muted: muted, device: device),
+                  variableValue: Double(level))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(accent)
+                .rotationEffect(.degrees(kind == .brightness ? Double(level) * 45 : 0))
+                .frame(width: earWidth, alignment: .leading)
+                .padding(.leading, 14)
+            Color.clear.frame(width: notchWidth)
+            HStack(spacing: 7) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(.white.opacity(0.18))
+                        Capsule().fill(accent).frame(width: max(4, geo.size.width * shown))
+                    }
                 }
+                .frame(height: 4)
+                Text(muted ? "Mute" : "\(Int((level * 100).rounded()))")
+                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.9))
+                    .frame(width: 26, alignment: .trailing)
             }
-            .frame(height: 6)
+            .frame(width: earWidth)
+            .padding(.trailing, 14)
         }
+        .padding(.horizontal, inset - 14)
+        .frame(maxHeight: .infinity)
         .animation(.spring(duration: 0.25, bounce: 0.1), value: shown)
-        Text(muted ? "Muted" : "\(Int((level * 100).rounded()))%")
-            .font(.system(size: 13, weight: .semibold).monospacedDigit())
-            .frame(width: 50, alignment: .trailing)
+        .animation(.spring(duration: 0.3, bounce: 0.15), value: level)
     }
+}
 
-    private var symbol: String {
+/// One symbol per level pop-up whose rays or waves fill with the level.
+private enum LevelSymbol {
+    static func name(kind: NotchViewModel.Activity, level: Float, muted: Bool, device: String) -> String {
         if kind == .brightness { return "sun.max.fill" }
         if muted || level == 0 { return "speaker.slash.fill" }
         let lowered = device.lowercased()
