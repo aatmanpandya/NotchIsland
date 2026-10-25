@@ -186,6 +186,7 @@ private struct VolumeBrightnessSettings: View {
             Toggle("Brightness", isOn: $brightness)
             Toggle("Hide the system pop-up", isOn: $replaceSystem)
                 .disabled(!volume && !brightness)
+            if replaceSystem { AccessibilityRow() }
             #endif
         } header: {
             Text("Volume and brightness")
@@ -198,6 +199,30 @@ private struct VolumeBrightnessSettings: View {
         }
     }
 }
+
+#if DIRECT_DISTRIBUTION
+/// Whether macOS allows the key takeover, checked every second while Settings is open.
+private struct AccessibilityRow: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            HStack {
+                Text("Accessibility permission")
+                Spacer()
+                if MediaKeyTap.isTrusted {
+                    Label("Allowed", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Button("Open Accessibility Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+#endif
 
 struct CalendarAccessRow: View {
     @ObservedObject var calendar: CalendarService

@@ -30,5 +30,15 @@ if [ "$EDITION" = direct ]; then
   codesign --force --sign - "$APP/Contents/Resources/NowPlayingHelper.dylib"
 fi
 
-codesign --force --sign - "$APP"
+# Sign with an Apple Development certificate when there is one, so macOS keeps permissions
+# (Accessibility, system audio, camera) across rebuilds. Ad-hoc signing changes identity on
+# every build, so macOS asks again each time.
+IDENTITY=$(security find-identity -v -p codesigning | grep -m1 "Apple Development" | sed -E 's/.*"(.*)"/\1/' || true)
+if [ -n "$IDENTITY" ]; then
+  codesign --force --deep --sign "$IDENTITY" "$APP"
+  echo "Signed with $IDENTITY"
+else
+  codesign --force --sign - "$APP"
+  echo "Signed ad-hoc (no Apple Development certificate): macOS will ask for permissions again after each build"
+fi
 echo "Built $APP ($EDITION edition)"
