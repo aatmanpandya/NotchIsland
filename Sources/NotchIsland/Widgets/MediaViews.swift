@@ -150,8 +150,9 @@ private struct PlayButton: View {
                 .foregroundStyle(.black)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 40, height: 40)
+                // Solid white, not tinted glass: tinted glass renders too dark for the black icon.
                 .background(Circle().fill(.white))
-                .shadow(color: .white.opacity(0.25), radius: 8)
+                .shadow(color: .white.opacity(0.2), radius: 8)
         }
         .buttonStyle(PressScaleStyle())
     }
@@ -168,8 +169,9 @@ private struct ControlButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size, weight: .semibold))
-                .frame(width: size + 18, height: size + 14)
-                .background(Circle().fill(.white.opacity(isHovered && enabled ? 0.12 : 0)))
+                .frame(width: size + 18, height: size + 18)
+                .islandGlass(in: Circle(), tint: .white.opacity(isHovered && enabled ? 0.12 : 0),
+                             interactive: enabled)
                 .contentShape(Circle())
         }
         .buttonStyle(PressScaleStyle())

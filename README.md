@@ -4,9 +4,10 @@ A Dynamic Island–style companion for the MacBook notch. Hover the notch to exp
 
 ## Status
 
-Prototype (v0.3). Working:
+Prototype (v0.4). Working:
 
-- Notch overlay that expands on hover with a spring animation and an artwork-tinted glow
+- Notch overlay that expands on hover with a spring animation
+- Liquid Glass design (macOS 26+): solid black where it meets the notch, fading into dark glass with the artwork's color glowing through; frosted blur on macOS 14–15
 - Now playing from Apple Music, Spotify, and any tab in Chrome, Arc, Edge or Brave (YouTube, YouTube Music, Netflix, Spotify web, SoundCloud, Twitch and any site with a video or audio player)
 - Direct-download edition: every app that reports to macOS Now Playing (VLC, IINA, Apple TV, Podcasts, Safari and more)
 - Play/pause, skip and seek; click the artwork to jump to the app or tab
@@ -34,6 +35,12 @@ There are two editions from the same code:
 The direct edition's system-wide source uses the private MediaRemote framework. Since macOS 15.4 that framework only answers Apple-signed processes, so `Helpers/NowPlayingHelper` is a small library the app loads into `/usr/bin/perl`, which streams JSON lines back over a pipe. A future macOS update could close this route; the other sources keep working if it does.
 
 The first time it reads Music or Spotify, macOS asks for Automation permission.
+
+Building with Xcode's toolchain (macOS 26 SDK or later) enables real Liquid Glass. To hold the island in one state for design work, launch it with a preview state: `expanded`, `charging`, `unplugged`, `full`, `low`, `nowplaying` or `call`.
+
+```bash
+open --env NOTCHISLAND_PREVIEW=expanded build/NotchIsland.app
+```
 
 ### Browser extension
 

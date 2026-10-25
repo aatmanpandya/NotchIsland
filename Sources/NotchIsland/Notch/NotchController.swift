@@ -34,6 +34,8 @@ final class NotchController {
     private var screen: NSScreen?
     private var monitors: [Any] = []
     private var pendingToggle: DispatchWorkItem?
+    /// Set by preview mode, so hovering doesn't change the pinned state.
+    private var isPinned = false
 
     init() {
         // Order is priority when several are playing: the dedicated sources give richer
@@ -70,6 +72,10 @@ final class NotchController {
             self?.trackMouse()
             return event
         }) { monitors.append(local) }
+
+        if let preview = ProcessInfo.processInfo.environment["NOTCHISLAND_PREVIEW"]?.lowercased() {
+            isPinned = viewModel.pinForPreview(preview)
+        }
     }
 
     /// Prefer the built-in display with a notch; fall back to the main screen.
@@ -102,7 +108,7 @@ final class NotchController {
             .contains(NSEvent.mouseLocation)
         panel.ignoresMouseEvents = !inside
 
-        guard inside != expanded else {
+        guard !isPinned, inside != expanded else {
             pendingToggle?.cancel()
             pendingToggle = nil
             return

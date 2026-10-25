@@ -49,8 +49,8 @@ struct NotchView: View {
         .frame(width: size.width, height: size.height, alignment: .top)
         .background { IslandBackground(vm: vm, mode: mode) }
         .clipShape(shape)
-        .overlay { shape.stroke(.white.opacity(mode == .collapsed ? 0 : 0.08), lineWidth: 1) }
-        .shadow(color: .black.opacity(mode == .collapsed ? 0 : 0.5), radius: 18, y: 8)
+        .overlay { if mode != .collapsed { GlassRim(shape: shape) } }
+        .shadow(color: .black.opacity(mode == .collapsed ? 0 : 0.35), radius: 24, y: 10)
         .contextMenu { IslandMenu() }
         .animation(IslandMotion.morph, value: mode)
         .animation(IslandMotion.morph, value: vm.showsEars)
@@ -69,32 +69,56 @@ struct NotchView: View {
     }
 }
 
-/// Black, with a soft glow of the artwork or the pop-up's color bleeding in from the left.
+/// "Black core, glass body": solid black where the island meets the hardware notch, fading into
+/// dark glass below, with the artwork or pop-up color glowing through it.
 private struct IslandBackground: View {
     @ObservedObject var vm: NotchViewModel
     let mode: NotchViewModel.Mode
 
+    /// How far below the notch the black takes to fade out.
+    private let fadeDepth: CGFloat = 44
+
     var body: some View {
-        ZStack(alignment: .leading) {
+        if mode == .collapsed {
             Color.black
-            switch mode {
-            case .expanded:
-                if let artwork = vm.media.current?.artwork {
-                    Image(nsImage: artwork)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 300, height: 300)
-                        .blur(radius: 70)
-                        .opacity(0.5)
-                        .offset(x: -40)
+        } else {
+            GeometryReader { geo in
+                let height = max(geo.size.height, 1)
+                let solidEnd = min(1, vm.notchSize.height / height)
+                let fadeEnd = min(1, (vm.notchSize.height + fadeDepth) / height)
+                ZStack(alignment: .leading) {
+                    Color.clear.islandGlass(in: Rectangle(), tint: .black.opacity(0.62))
+                    glow
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: solidEnd),
+                            .init(color: .black.opacity(0), location: fadeEnd),
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
                 }
-                LinearGradient(colors: [.clear, .black.opacity(0.35)], startPoint: .top, endPoint: .bottom)
-            case .activity(let activity):
-                RadialGradient(colors: [activity.accent(media: vm.media).opacity(0.35), .clear],
-                               center: .leading, startRadius: 0, endRadius: 220)
-            case .collapsed:
-                EmptyView()
             }
+        }
+    }
+
+    @ViewBuilder private var glow: some View {
+        switch mode {
+        case .expanded:
+            if let artwork = vm.media.current?.artwork {
+                Image(nsImage: artwork)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 300, height: 300)
+                    .blur(radius: 70)
+                    .opacity(0.4)
+                    .offset(x: -40)
+            }
+        case .activity(let activity):
+            RadialGradient(colors: [activity.accent(media: vm.media).opacity(0.3), .clear],
+                           center: .leading, startRadius: 0, endRadius: 220)
+        case .collapsed:
+            EmptyView()
         }
     }
 }

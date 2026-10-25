@@ -138,6 +138,24 @@ final class NotchViewModel: ObservableObject {
         show(.call, for: 5)
     }
 
+    /// Holds the island in one state for design work and screenshots:
+    /// `NOTCHISLAND_PREVIEW=<state> open build/NotchIsland.app`. Returns false for unknown names.
+    func pinForPreview(_ name: String) -> Bool {
+        let activities: [String: Activity] = [
+            "charging": .charging, "unplugged": .unplugged, "full": .fullyCharged,
+            "low": .lowBattery, "nowplaying": .nowPlaying, "call": .call,
+        ]
+        if name == "expanded" {
+            isExpanded = true
+        } else if let pinned = activities[name] {
+            if pinned == .call { call = CallInfo(site: "Google Meet", startedAt: Date().addingTimeInterval(-75)) }
+            activity = pinned
+        } else {
+            return false
+        }
+        return true
+    }
+
     private func revealEars(for seconds: TimeInterval) {
         let hideAt = Date().addingTimeInterval(seconds)
         if earsRevealed, let current = earsHideAt, current > hideAt { return }
