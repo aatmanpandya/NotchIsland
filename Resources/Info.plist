@@ -22,6 +22,10 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>NotchIsland shows your next meeting in the notch, with a Join button and a reminder 5 minutes before it starts.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>NotchIsland shows your next meeting in the notch, with a Join button and a reminder 5 minutes before it starts.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>NotchIsland reads what's playing in Music and Spotify and lets you control playback from the notch.</string>
 </dict>

@@ -4,7 +4,7 @@ A Dynamic Island–style companion for the MacBook notch. Hover the notch to exp
 
 ## Status
 
-Prototype (v0.4). Working:
+Prototype (v0.5). Working:
 
 - Notch overlay that expands on hover with a spring animation
 - Liquid Glass design (macOS 26+): solid black where it meets the notch, fading into dark glass with the artwork's color glowing through; frosted blur on macOS 14–15
@@ -12,8 +12,9 @@ Prototype (v0.4). Working:
 - Direct-download edition: every app that reports to macOS Now Playing (VLC, IINA, Apple TV, Podcasts, Safari and more)
 - Play/pause, skip and seek; click the artwork to jump to the app or tab
 - Live "ears" beside the notch while something plays
-- Pop-ups: charging (with time to full), unplugged (with time left), fully charged, low battery, and new track
-- Clock, date and week strip
+- Pop-ups: charging (with time to full), unplugged (with time left), fully charged, low battery at 20% and 10% with a Low Power Mode button, and new track
+- Up next: your next calendar event with a countdown and a Join button for Meet, Zoom, Teams and other call links; a reminder pop-up 5 minutes before each meeting
+- Call-started pop-up for browser video calls
 - Right-click the island for Open at Login and Quit
 
 ## Build and run
@@ -36,7 +37,7 @@ The direct edition's system-wide source uses the private MediaRemote framework. 
 
 The first time it reads Music or Spotify, macOS asks for Automation permission.
 
-Building with Xcode's toolchain (macOS 26 SDK or later) enables real Liquid Glass. To hold the island in one state for design work, launch it with a preview state: `expanded`, `charging`, `unplugged`, `full`, `low`, `nowplaying` or `call`.
+Building with Xcode's toolchain (macOS 26 SDK or later) enables real Liquid Glass. To hold the island in one state for design work, launch it with a preview state: `expanded`, `upnext` (expanded with sample meetings), `charging`, `unplugged`, `full`, `low`, `nowplaying`, `call` or `meeting`.
 
 ```bash
 open --env NOTCHISLAND_PREVIEW=expanded build/NotchIsland.app
@@ -56,10 +57,11 @@ The extension talks to the app over a WebSocket on `127.0.0.1:47823`. The app on
 - `Media/`: `MediaSource` protocol plus sources. `ScriptableAppSource` covers Music and Spotify, `BrowserBridgeSource` receives browser tabs from the extension, and `SystemNowPlayingSource` (direct edition only, behind `DIRECT_DISTRIBUTION`) reads the system feed through the helper
 - `Helpers/NowPlayingHelper/`: Objective-C library that talks to MediaRemote
 - `Extensions/Chrome/`: Manifest V3 extension. `page.js` reads the page's media session and players, `relay.js` forwards to `background.js`, which holds the socket to the app
-- `Widgets/`: media, clock and battery views, and the battery service
+- `Calendar/`: `CalendarService` (EventKit; asks for access only when the user taps the button) and the Up next views
+- `Widgets/`: media and battery views, and the battery service
 
 ## Roadmap
 
-- v1: Xcode project, sandboxed App Store build, calendar events, pairing between app and extension
+- v1: Xcode project, sandboxed App Store build, settings window and onboarding, pairing between app and extension
 - v1.1: Safari extension
 - v2: on-device assistant in the island (Apple Foundation Models), App Intents for Siri and Shortcuts

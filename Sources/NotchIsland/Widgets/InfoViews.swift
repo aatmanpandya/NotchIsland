@@ -1,56 +1,5 @@
 import SwiftUI
 
-struct ClockPanel: View {
-    var tint: Color = .white
-
-    var body: some View {
-        TimelineView(.everyMinute) { context in
-            VStack(alignment: .leading, spacing: 2) {
-                Text(context.date, format: .dateTime.weekday(.wide))
-                    .font(.system(size: 11, weight: .bold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(tint)
-                Text(context.date, format: .dateTime.hour(.defaultDigits(amPM: .omitted)).minute())
-                    .font(.system(size: 40, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(LinearGradient(colors: [.white, .white.opacity(0.7)], startPoint: .top, endPoint: .bottom))
-                    .contentTransition(.numericText())
-                Text(context.date, format: .dateTime.month(.wide).day())
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
-                Spacer(minLength: 0)
-                WeekStrip(date: context.date, tint: tint)
-            }
-        }
-    }
-}
-
-private struct WeekStrip: View {
-    let date: Date
-    let tint: Color
-
-    var body: some View {
-        let calendar = Calendar.current
-        let start = calendar.dateInterval(of: .weekOfYear, for: date)?.start ?? date
-        HStack(spacing: 0) {
-            ForEach(0..<7, id: \.self) { offset in
-                let day = calendar.date(byAdding: .day, value: offset, to: start) ?? start
-                let isToday = calendar.isDate(day, inSameDayAs: date)
-                VStack(spacing: 3) {
-                    Text(day, format: .dateTime.weekday(.narrow))
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                    Text(day, format: .dateTime.day())
-                        .font(.system(size: 11, weight: isToday ? .bold : .regular).monospacedDigit())
-                        .foregroundStyle(isToday ? .black : .secondary)
-                        .frame(width: 18, height: 18)
-                        .background(Circle().fill(isToday ? tint : .clear))
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-    }
-}
-
 struct BatteryIndicator: View {
     @ObservedObject var battery: BatteryService
 
@@ -58,7 +7,8 @@ struct BatteryIndicator: View {
         if battery.hasBattery {
             HStack(spacing: 6) {
                 Text("\(battery.level)%").monospacedDigit()
-                BatteryGlyph(level: battery.level, isCharging: battery.isPluggedIn)
+                BatteryGlyph(level: battery.level, isCharging: battery.isPluggedIn,
+                             isLowPower: battery.isLowPowerMode)
             }
         }
     }
@@ -67,8 +17,13 @@ struct BatteryIndicator: View {
 private struct BatteryGlyph: View {
     let level: Int
     let isCharging: Bool
+    let isLowPower: Bool
 
-    private var fill: Color { isCharging ? .green : level <= 20 ? .red : .white }
+    private var fill: Color {
+        if isCharging { return .green }
+        if isLowPower { return .yellow }
+        return level <= 20 ? .red : .white
+    }
 
     var body: some View {
         HStack(spacing: 1) {

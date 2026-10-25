@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import IOKit.ps
 
 final class BatteryService: ObservableObject {
@@ -16,14 +16,19 @@ final class BatteryService: ObservableObject {
     /// macOS's estimate; nil while it is still calculating.
     @Published private(set) var minutesToFull: Int?
     @Published private(set) var minutesToEmpty: Int?
+    @Published private(set) var isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
 
     var onEvent: ((Event) -> Void)?
 
     private static let lowThresholds = [20, 10]
     private var runLoopSource: CFRunLoopSource?
+    private var powerStateObserver: NSObjectProtocol?
 
     init() {
         update(notify: false)
+        powerStateObserver = NotificationCenter.default.addObserver(
+            forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main
+        ) { [weak self] _ in self?.isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled }
         let ctx = Unmanaged.passUnretained(self).toOpaque()
         if let src = IOPSNotificationCreateRunLoopSource({ ctx in
             guard let ctx else { return }
@@ -62,6 +67,16 @@ final class BatteryService: ObservableObject {
                 onEvent?(.low)
             }
             return
+        }
+    }
+}
+
+extension BatteryService {
+    /// macOS has no public API for apps to switch Low Power Mode on, so this opens Battery
+    /// settings, where it is a single toggle.
+    func openLowPowerSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") {
+            NSWorkspace.shared.open(url)
         }
     }
 }

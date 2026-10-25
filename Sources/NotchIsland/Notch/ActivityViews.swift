@@ -1,13 +1,14 @@
 import SwiftUI
 
 extension NotchViewModel.Activity {
-    func accent(media: MediaController) -> Color {
+    func accent(in vm: NotchViewModel) -> Color {
         switch self {
         case .charging, .fullyCharged: .green
         case .unplugged: .white
-        case .lowBattery: .red
-        case .nowPlaying: media.tint
+        case .lowBattery: vm.battery.isLowPowerMode ? .yellow : .red
+        case .nowPlaying: vm.media.tint
         case .call: .green
+        case .meetingSoon: vm.soonMeeting?.color ?? .blue
         }
     }
 }
@@ -19,7 +20,7 @@ struct ActivityView: View {
     let namespace: Namespace.ID
 
     var body: some View {
-        let accent = activity.accent(media: vm.media)
+        let accent = activity.accent(in: vm)
         VStack(spacing: 0) {
             // Top row, beside the hardware notch. The now-playing pop-up leaves it empty so the
             // artwork and bars below aren't shown twice.
@@ -31,6 +32,14 @@ struct ActivityView: View {
                     Image(systemName: "video.fill").foregroundStyle(accent)
                     Spacer()
                     CallTimer(startedAt: vm.call?.startedAt ?? Date()).foregroundStyle(accent)
+                case .meetingSoon:
+                    Image(systemName: "calendar").foregroundStyle(accent)
+                    Spacer()
+                    if let meeting = vm.soonMeeting {
+                        TimelineView(.periodic(from: .now, by: 15)) { context in
+                            Text(MeetingTime.countdown(to: meeting, at: context.date)).foregroundStyle(accent)
+                        }
+                    }
                 default:
                     batteryIcon.foregroundStyle(accent)
                     Spacer()
@@ -57,7 +66,7 @@ struct ActivityView: View {
         case .charging, .fullyCharged: Image(systemName: "bolt.fill").symbolEffect(.pulse)
         case .unplugged: Image(systemName: "powerplug.fill")
         case .lowBattery: Image(systemName: "exclamationmark.triangle.fill")
-        case .nowPlaying, .call: EmptyView()
+        case .nowPlaying, .call, .meetingSoon: EmptyView()
         }
     }
 
@@ -81,6 +90,20 @@ struct ActivityView: View {
             titles("Call started", vm.call?.site ?? "")
             Spacer(minLength: 0)
             LiveBadge(color: accent)
+        case .meetingSoon:
+            let meeting = vm.soonMeeting
+            Image(systemName: meeting?.joinURL == nil ? "calendar" : "video.fill")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(accent.opacity(0.18)))
+            titles(meeting?.title ?? "Meeting", meeting.map { "Starts \(MeetingTime.range($0))" } ?? "")
+            Spacer(minLength: 0)
+            if let url = meeting?.joinURL { JoinButton(url: url, color: accent) }
+        case .lowBattery:
+            titles(batteryTitle, batterySubtitle)
+            Spacer(minLength: 0)
+            LowPowerButton(battery: vm.battery)
         default:
             titles(batteryTitle, batterySubtitle)
             Spacer(minLength: 0)
@@ -109,7 +132,7 @@ struct ActivityView: View {
         case .unplugged: "On Battery"
         case .fullyCharged: "Fully Charged"
         case .lowBattery: "Low Battery"
-        case .nowPlaying, .call: ""
+        case .nowPlaying, .call, .meetingSoon: ""
         }
     }
 
@@ -119,9 +142,30 @@ struct ActivityView: View {
         case .charging: return battery.minutesToFull.map { "Full in \($0.durationText)" } ?? "Power adapter connected"
         case .unplugged: return battery.minutesToEmpty.map { "About \($0.durationText) left" } ?? "Power adapter disconnected"
         case .fullyCharged: return "You can unplug now"
-        case .lowBattery: return "Plug in soon"
-        case .nowPlaying, .call: return ""
+        case .lowBattery: return "\(battery.level)% remaining"
+        case .nowPlaying, .call, .meetingSoon: return ""
         }
+    }
+}
+
+/// Like the iPhone's low-battery alert: one tap toward Low Power Mode, and "On" once it's enabled.
+private struct LowPowerButton: View {
+    @ObservedObject var battery: BatteryService
+
+    var body: some View {
+        Button { battery.openLowPowerSettings() } label: {
+            Label(battery.isLowPowerMode ? "Low Power On" : "Low Power Mode",
+                  systemImage: battery.isLowPowerMode ? "checkmark" : "leaf.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(.yellow))
+                .shadow(color: .yellow.opacity(0.4), radius: 6)
+        }
+        .buttonStyle(PressScaleStyle())
+        .disabled(battery.isLowPowerMode)
+        .help("Opens Battery settings, where Low Power Mode is one toggle")
     }
 }
 

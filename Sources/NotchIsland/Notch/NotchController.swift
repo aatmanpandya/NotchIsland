@@ -50,7 +50,7 @@ final class NotchController {
         if let system = SystemNowPlayingSource() { sources.append(system) }
         #endif
         let media = MediaController(sources: sources)
-        viewModel = NotchViewModel(media: media, battery: BatteryService())
+        viewModel = NotchViewModel(media: media, battery: BatteryService(), calendar: CalendarService())
         browser.onCallStarted = { [weak viewModel] site in viewModel?.callStarted(site: site) }
 
         let host = FirstMouseHostingView(rootView: NotchView(vm: viewModel))

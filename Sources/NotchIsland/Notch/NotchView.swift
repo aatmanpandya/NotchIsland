@@ -170,7 +170,7 @@ private struct IslandBackground: View {
                     .offset(x: -40)
             }
         case .activity(let activity):
-            RadialGradient(colors: [activity.accent(media: vm.media).opacity(0.3), .clear],
+            RadialGradient(colors: [activity.accent(in: vm).opacity(0.3), .clear],
                            center: .leading, startRadius: 0, endRadius: 220)
         case .collapsed:
             EmptyView()
@@ -245,8 +245,8 @@ private struct ExpandedView: View {
                 MediaPanel(media: vm.media, namespace: namespace)
                 LinearGradient(colors: [.clear, .white.opacity(0.12), .clear], startPoint: .top, endPoint: .bottom)
                     .frame(width: 1)
-                ClockPanel(tint: vm.media.current == nil ? .white : vm.media.tint)
-                    .frame(width: 156, alignment: .leading)
+                UpNextPanel(calendar: vm.calendar)
+                    .frame(width: 168, alignment: .leading)
             }
             .padding(.horizontal, inset)
             .padding(.top, 12)

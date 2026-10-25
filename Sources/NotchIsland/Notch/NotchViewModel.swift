@@ -10,6 +10,7 @@ final class NotchViewModel: ObservableObject {
         case lowBattery
         case nowPlaying
         case call
+        case meetingSoon
     }
 
     struct CallInfo {
@@ -28,11 +29,14 @@ final class NotchViewModel: ObservableObject {
     @Published private(set) var activity: Activity?
     /// The call announced by the most recent call pop-up.
     @Published private(set) var call: CallInfo?
+    /// The meeting announced by the most recent meeting pop-up.
+    @Published private(set) var soonMeeting: Meeting?
     /// Whether the ears are currently out; they tuck away a few seconds after playback starts.
     @Published private(set) var earsRevealed = false
 
     let media: MediaController
     let battery: BatteryService
+    let calendar: CalendarService
     let expandedSize = CGSize(width: 640, height: 210)
 
     private var cancellables = Set<AnyCancellable>()
@@ -42,9 +46,14 @@ final class NotchViewModel: ObservableObject {
     private let earsLinger: TimeInterval = 5
     private let launchedAt = Date()
 
-    init(media: MediaController, battery: BatteryService) {
+    init(media: MediaController, battery: BatteryService, calendar: CalendarService) {
         self.media = media
         self.battery = battery
+        self.calendar = calendar
+        calendar.onMeetingSoon = { [weak self] meeting in
+            self?.soonMeeting = meeting
+            self?.show(.meetingSoon, for: 8)
+        }
         // The collapsed size depends on media state, so re-render when it changes.
         media.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
 
@@ -53,7 +62,8 @@ final class NotchViewModel: ObservableObject {
             case .pluggedIn: self?.show(.charging)
             case .unplugged: self?.show(.unplugged)
             case .fullyCharged: self?.show(.fullyCharged)
-            case .low: self?.show(.lowBattery, for: 5)
+            // Longer, so there's time to reach the Low Power Mode button.
+            case .low: self?.show(.lowBattery, for: 8)
             }
         }
 
@@ -143,12 +153,19 @@ final class NotchViewModel: ObservableObject {
     func pinForPreview(_ name: String) -> Bool {
         let activities: [String: Activity] = [
             "charging": .charging, "unplugged": .unplugged, "full": .fullyCharged,
-            "low": .lowBattery, "nowplaying": .nowPlaying, "call": .call,
+            "low": .lowBattery, "nowplaying": .nowPlaying, "call": .call, "meeting": .meetingSoon,
         ]
         if name == "expanded" {
             isExpanded = true
+        } else if name == "upnext" {
+            calendar.useSampleMeetings()
+            isExpanded = true
         } else if let pinned = activities[name] {
             if pinned == .call { call = CallInfo(site: "Google Meet", startedAt: Date().addingTimeInterval(-75)) }
+            if pinned == .meetingSoon {
+                calendar.useSampleMeetings()
+                soonMeeting = calendar.next
+            }
             activity = pinned
         } else {
             return false
