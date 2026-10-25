@@ -59,7 +59,7 @@ struct NotchView: View {
                     .frame(width: size.width, height: size.height)
                     .transition(contentTransition)
                     .id(activity)
-                    .onTapGesture { vm.isExpanded = true }
+                    .onTapGesture { if !vm.activityIsInteractive { vm.isExpanded = true } }
             case .collapsed:
                 CollapsedView(vm: vm, namespace: island)
                     .frame(width: size.width, height: size.height)

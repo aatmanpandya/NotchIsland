@@ -177,6 +177,14 @@ final class NotchController {
         let inside = islandRect(for: viewModel.mode).insetBy(dx: -slop, dy: -slop).contains(mouse)
         panel.ignoresMouseEvents = !inside
 
+        // A pop-up with buttons (Dismiss, Join, Low Power Mode) stays a pop-up under the cursor,
+        // so the click reaches its buttons instead of opening the full panel.
+        if inside, !expanded, viewModel.activityIsInteractive {
+            pendingToggle?.cancel()
+            pendingToggle = nil
+            return
+        }
+
         guard !isPinned, inside != expanded else {
             pendingToggle?.cancel()
             pendingToggle = nil

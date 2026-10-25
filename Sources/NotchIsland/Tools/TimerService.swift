@@ -35,6 +35,15 @@ final class TimerService: ObservableObject {
     }
 
     private var finishTimer: Timer?
+    /// The alarm keeps ringing until it's dismissed, like an iPhone timer.
+    private var alarm: NSSound?
+
+    var isRinging: Bool { alarm != nil }
+
+    func stopAlarm() {
+        alarm?.stop()
+        alarm = nil
+    }
 
     init() {
         label = UserDefaults.standard.string(forKey: Key.label) ?? ""
@@ -63,6 +72,7 @@ final class TimerService: ObservableObject {
     }
 
     func start(seconds: TimeInterval) {
+        stopAlarm()
         duration = seconds
         pausedRemaining = nil
         endDate = Date().addingTimeInterval(seconds)
@@ -120,7 +130,10 @@ final class TimerService: ObservableObject {
 
     private func finish() {
         cancel()
-        NSSound(named: soundName)?.play()
+        let sound = NSSound(named: soundName)?.copy() as? NSSound
+        sound?.loops = true
+        sound?.play()
+        alarm = sound
         onFinish?()
     }
 

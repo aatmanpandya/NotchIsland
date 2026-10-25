@@ -132,7 +132,10 @@ struct ActivityView: View {
                     vm.timer.addMinute()
                     vm.dismissActivity()
                 }
-                PopUpButton(title: "Dismiss", tint: accent, foreground: .black) { vm.dismissActivity() }
+                PopUpButton(title: "Dismiss", tint: accent, foreground: .black) {
+                    vm.timer.stopAlarm()
+                    vm.dismissActivity()
+                }
             }
         case .volume, .brightness:
             LevelPopUp(kind: activity, level: vm.hudLevel, muted: vm.hudMuted, device: vm.hudDevice, accent: accent)

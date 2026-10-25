@@ -92,7 +92,8 @@ final class NotchViewModel: ObservableObject {
         self.stopwatch = stopwatch
         self.bluetooth = bluetooth
         self.shelf = shelf
-        timer.onFinish = { [weak self] in self?.show(.timerDone, for: 12) }
+        // Stays up until Dismiss or +1 min, while the alarm rings.
+        timer.onFinish = { [weak self] in self?.show(.timerDone, for: nil) }
         timer.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         stopwatch.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
 
@@ -315,10 +316,19 @@ final class NotchViewModel: ObservableObject {
         activity = nil
     }
 
-    private func show(_ activity: Activity, for seconds: TimeInterval = 3.5) {
+    /// Pop-ups with buttons, which hovering mustn't turn into the full panel.
+    var activityIsInteractive: Bool {
+        [.timerDone, .lowBattery, .meetingSoon].contains(activity)
+    }
+
+    /// `seconds: nil` keeps the pop-up until it's dismissed.
+    private func show(_ activity: Activity, for seconds: TimeInterval? = 3.5) {
         guard Preferences.isPopUpEnabled(activity.settingsKey) else { return }
+        // A ringing timer keeps its pop-up until the user answers it.
+        if self.activity == .timerDone, activity != .timerDone { return }
         activityDismissal?.cancel()
         self.activity = activity
+        guard let seconds else { return }
         let work = DispatchWorkItem { [weak self] in self?.activity = nil }
         activityDismissal = work
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
