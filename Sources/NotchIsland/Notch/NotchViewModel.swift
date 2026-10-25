@@ -20,6 +20,8 @@ final class NotchViewModel: ObservableObject {
     @Published var isExpanded = false
     @Published private(set) var notchSize = CGSize(width: 185, height: 32)
     @Published private(set) var activity: Activity?
+    /// Whether the ears are currently out; they tuck away a few seconds after playback starts.
+    @Published private(set) var earsRevealed = false
 
     let media: MediaController
     let battery: BatteryService
@@ -27,6 +29,9 @@ final class NotchViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var activityDismissal: DispatchWorkItem?
+    private var earsDismissal: DispatchWorkItem?
+    private var earsHideAt: Date?
+    private let earsLinger: TimeInterval = 5
     private let launchedAt = Date()
 
     init(media: MediaController, battery: BatteryService) {
@@ -52,6 +57,18 @@ final class NotchViewModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self, Date().timeIntervalSince(launchedAt) > 2 else { return }
                 if activity == nil || activity == .nowPlaying { show(.nowPlaying, for: 3) }
+                revealEars(for: 3 + earsLinger)
+            }
+            .store(in: &cancellables)
+
+        // Starting or resuming playback brings the ears out briefly.
+        media.$current
+            .map { $0?.isPlaying == true }
+            .removeDuplicates()
+            .filter { $0 }
+            .sink { [weak self] _ in
+                guard let self else { return }
+                revealEars(for: earsLinger)
             }
             .store(in: &cancellables)
     }
@@ -62,8 +79,8 @@ final class NotchViewModel: ObservableObject {
         return .collapsed
     }
 
-    /// The island grows "ears" beside the notch while something plays.
-    var showsEars: Bool { media.current?.isPlaying == true }
+    /// The island grows "ears" beside the notch for a few seconds when playback starts.
+    var showsEars: Bool { earsRevealed && media.current?.isPlaying == true }
     var earWidth: CGFloat { notchSize.height + 12 }
 
     func topRadius(for mode: Mode) -> CGFloat {
@@ -104,6 +121,18 @@ final class NotchViewModel: ObservableObject {
             // No hardware notch: draw a pill the height of the menu bar.
             notchSize = CGSize(width: 185, height: max(24, screen.frame.maxY - screen.visibleFrame.maxY))
         }
+    }
+
+    /// Extends the reveal; a shorter request never cuts an earlier, longer one short.
+    private func revealEars(for seconds: TimeInterval) {
+        let hideAt = Date().addingTimeInterval(seconds)
+        if earsRevealed, let current = earsHideAt, current > hideAt { return }
+        earsHideAt = hideAt
+        earsDismissal?.cancel()
+        earsRevealed = true
+        let work = DispatchWorkItem { [weak self] in self?.earsRevealed = false }
+        earsDismissal = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
     }
 
     private func show(_ activity: Activity, for seconds: TimeInterval = 3.5) {
