@@ -217,34 +217,46 @@ private struct SlimLevelPopUp: View {
     let earWidth: CGFloat
     let inset: CGFloat
 
+    /// Same margin from each outer edge, and the same gap from the notch, on both sides.
+    private let edgeMargin: CGFloat = 12
+    private let notchGap: CGFloat = 10
+
     var body: some View {
         let shown = muted ? 0 : CGFloat(level)
         HStack(spacing: 0) {
-            Image(systemName: LevelSymbol.name(kind: kind, level: level, muted: muted, device: device),
-                  variableValue: Double(level))
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(accent)
-                .rotationEffect(.degrees(kind == .brightness ? Double(level) * 45 : 0))
-                .frame(width: earWidth, alignment: .leading)
-                .padding(.leading, 14)
+            HStack {
+                Image(systemName: LevelSymbol.name(kind: kind, level: level, muted: muted, device: device),
+                      variableValue: Double(level))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .rotationEffect(.degrees(kind == .brightness ? Double(level) * 45 : 0))
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, edgeMargin)
+            .padding(.trailing, notchGap)
+            .frame(width: earWidth)
+
             Color.clear.frame(width: notchWidth)
-            HStack(spacing: 7) {
+
+            HStack(spacing: 8) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(.white.opacity(0.18))
                         Capsule().fill(accent).frame(width: max(4, geo.size.width * shown))
                     }
+                    .frame(maxHeight: .infinity)
                 }
                 .frame(height: 4)
                 Text(muted ? "Mute" : "\(Int((level * 100).rounded()))")
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.white.opacity(0.9))
-                    .frame(width: 26, alignment: .trailing)
+                    .frame(width: 30, alignment: .trailing)
             }
+            .padding(.leading, notchGap)
+            .padding(.trailing, edgeMargin)
             .frame(width: earWidth)
-            .padding(.trailing, 14)
         }
-        .padding(.horizontal, inset - 14)
+        .padding(.horizontal, inset)
         .frame(maxHeight: .infinity)
         .animation(.spring(duration: 0.25, bounce: 0.1), value: shown)
         .animation(.spring(duration: 0.3, bounce: 0.15), value: level)
