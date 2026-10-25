@@ -1,4 +1,3 @@
-import ServiceManagement
 import SwiftUI
 
 /// Every animation setting for the island, in one place for tuning.
@@ -182,13 +181,9 @@ private struct IslandMenu: View {
     @AppStorage(IslandMotion.styleKey) private var style: MotionStyle = .ios
 
     var body: some View {
+        Button("Settings…") { AppWindows.shared.showSettings() }
         Picker("Animation", selection: $style) {
             ForEach(MotionStyle.allCases) { Text($0.title).tag($0) }
-        }
-        Divider()
-        let loginItem = SMAppService.mainApp
-        Button(loginItem.status == .enabled ? "Don't Open at Login" : "Open at Login") {
-            try? loginItem.status == .enabled ? loginItem.unregister() : loginItem.register()
         }
         Divider()
         Button("Quit NotchIsland") { NSApp.terminate(nil) }

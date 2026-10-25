@@ -76,6 +76,12 @@ final class NotchController {
         if let preview = ProcessInfo.processInfo.environment["NOTCHISLAND_PREVIEW"]?.lowercased() {
             isPinned = viewModel.pinForPreview(preview)
         }
+
+        AppWindows.shared.calendar = viewModel.calendar
+        AppWindows.shared.onOnboardingFinished = { [weak viewModel] in viewModel?.demo() }
+        if !isPinned, !UserDefaults.standard.bool(forKey: Preferences.Key.hasOnboarded) {
+            AppWindows.shared.showOnboarding()
+        }
     }
 
     /// Prefer the built-in display with a notch; fall back to the main screen.
@@ -128,7 +134,7 @@ final class NotchController {
 
     private func setExpanded(_ expanded: Bool) {
         guard viewModel.isExpanded != expanded else { return }
-        if expanded {
+        if expanded, Preferences.haptics {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
         viewModel.isExpanded = expanded

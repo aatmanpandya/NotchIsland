@@ -11,8 +11,14 @@ final class MediaController: ObservableObject {
     private let sources: [MediaSource]
     private var tintArtworkID: String?
 
+    private var settingsObserver: NSObjectProtocol?
+
     init(sources: [MediaSource]) {
         self.sources = sources
+        // Sources can be switched off in Settings.
+        settingsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.recompute() }
         for source in sources {
             source.onChange = { [weak self] in self?.recompute() }
         }
@@ -26,7 +32,7 @@ final class MediaController: ObservableObject {
 
     /// Prefer whatever is playing; otherwise stay on the last source shown.
     private func recompute() {
-        let snapshots = sources.compactMap(\.snapshot)
+        let snapshots = sources.filter { Preferences.isSourceEnabled($0.id) }.compactMap(\.snapshot)
         let next = snapshots.first(where: \.isPlaying)
             ?? snapshots.first { $0.sourceID == current?.sourceID }
             ?? snapshots.first

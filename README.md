@@ -4,7 +4,7 @@ A Dynamic Island–style companion for the MacBook notch. Hover the notch to exp
 
 ## Status
 
-Prototype (v0.5). Working:
+Prototype (v0.6). Working:
 
 - Notch overlay that expands on hover with a spring animation
 - Liquid Glass design (macOS 26+): solid black where it meets the notch, fading into dark glass with the artwork's color glowing through; frosted blur on macOS 14–15
@@ -15,7 +15,8 @@ Prototype (v0.5). Working:
 - Pop-ups: charging (with time to full), unplugged (with time left), fully charged, low battery at 20% and 10% with a Low Power Mode button, and new track
 - Up next: your next calendar event with a countdown and a Join button for Meet, Zoom, Teams and other call links; a reminder pop-up 5 minutes before each meeting
 - Call-started pop-up for browser video calls
-- Right-click the island for Open at Login and Quit
+- Settings window (right-click the island, or open the app again from Finder): open at login, animation, album-art timing, haptics, each media source, each pop-up, meeting reminder timing, calendar access
+- First-run onboarding: welcome, media and the browser extension, calendar access, open at login
 
 ## Build and run
 
@@ -59,9 +60,11 @@ The extension talks to the app over a WebSocket on `127.0.0.1:47823`. The app on
 - `Extensions/Chrome/`: Manifest V3 extension. `page.js` reads the page's media session and players, `relay.js` forwards to `background.js`, which holds the socket to the app
 - `Calendar/`: `CalendarService` (EventKit; asks for access only when the user taps the button) and the Up next views
 - `Widgets/`: media and battery views, and the battery service
+- `Settings/`: the Settings window, onboarding, and `AppWindows`, which opens them
+- `App/Preferences.swift`: every setting's key and default
 
 ## Roadmap
 
-- v1: Xcode project, sandboxed App Store build, settings window and onboarding, pairing between app and extension
+- v1: Xcode project, sandboxed App Store build, pairing between app and extension, Chrome Web Store listing
 - v1.1: Safari extension
 - v2: on-device assistant in the island (Apple Foundation Models), App Intents for Siri and Shortcuts

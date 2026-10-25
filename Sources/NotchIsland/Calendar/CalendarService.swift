@@ -24,9 +24,8 @@ final class CalendarService: ObservableObject {
     /// In-progress and upcoming events over the next week, soonest first.
     @Published private(set) var meetings: [Meeting] = []
 
-    /// Called once per event, `reminderLead` before it starts.
+    /// Called once per event, shortly before it starts (how early is a setting).
     var onMeetingSoon: ((Meeting) -> Void)?
-    static let reminderLead: TimeInterval = 5 * 60
 
     private static let lookahead: TimeInterval = 7 * 24 * 3600
     private static let meetingHosts = [
@@ -118,7 +117,7 @@ final class CalendarService: ObservableObject {
         for meeting in meetings where !announced.contains(meeting.id) {
             let lead = meeting.start.timeIntervalSince(now)
             // A meeting that started under a minute ago still gets its heads-up.
-            if lead <= Self.reminderLead, lead > -60 {
+            if lead <= Preferences.meetingLead, lead > -60 {
                 announced.insert(meeting.id)
                 onMeetingSoon?(meeting)
             }

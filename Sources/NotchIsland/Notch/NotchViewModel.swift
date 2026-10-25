@@ -13,6 +13,12 @@ final class NotchViewModel: ObservableObject {
         case meetingSoon
     }
 
+    /// Briefly opens the island so a new user sees where it lives.
+    func demo() {
+        isExpanded = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.isExpanded = false }
+    }
+
     struct CallInfo {
         let site: String
         let startedAt: Date
@@ -43,7 +49,6 @@ final class NotchViewModel: ObservableObject {
     private var activityDismissal: DispatchWorkItem?
     private var earsDismissal: DispatchWorkItem?
     private var earsHideAt: Date?
-    private let earsLinger: TimeInterval = 5
     private let launchedAt = Date()
 
     init(media: MediaController, battery: BatteryService, calendar: CalendarService) {
@@ -75,7 +80,7 @@ final class NotchViewModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self, Date().timeIntervalSince(launchedAt) > 2 else { return }
                 if activity == nil || activity == .nowPlaying { show(.nowPlaying, for: 3) }
-                revealEars(for: 3 + earsLinger)
+                revealEars(after: 3)
             }
             .store(in: &cancellables)
 
@@ -86,7 +91,7 @@ final class NotchViewModel: ObservableObject {
             .filter { $0 }
             .sink { [weak self] _ in
                 guard let self else { return }
-                revealEars(for: earsLinger)
+                revealEars()
             }
             .store(in: &cancellables)
     }
@@ -173,7 +178,19 @@ final class NotchViewModel: ObservableObject {
         return true
     }
 
-    private func revealEars(for seconds: TimeInterval) {
+    /// Brings the ears out for the user's chosen time, plus `extra` seconds. Extends an earlier
+    /// reveal but never cuts one short.
+    private func revealEars(after extra: TimeInterval = 0) {
+        let linger = Preferences.earsLinger
+        guard linger != 0 else { return }
+        if linger < 0 {
+            // "The whole time it plays": showsEars already requires playback.
+            earsDismissal?.cancel()
+            earsHideAt = .distantFuture
+            earsRevealed = true
+            return
+        }
+        let seconds = TimeInterval(linger) + extra
         let hideAt = Date().addingTimeInterval(seconds)
         if earsRevealed, let current = earsHideAt, current > hideAt { return }
         earsHideAt = hideAt
@@ -185,10 +202,26 @@ final class NotchViewModel: ObservableObject {
     }
 
     private func show(_ activity: Activity, for seconds: TimeInterval = 3.5) {
+        guard Preferences.isPopUpEnabled(activity.settingsKey) else { return }
         activityDismissal?.cancel()
         self.activity = activity
         let work = DispatchWorkItem { [weak self] in self?.activity = nil }
         activityDismissal = work
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
+    }
+}
+
+extension NotchViewModel.Activity {
+    /// Names the on/off switch for this pop-up in Settings.
+    var settingsKey: String {
+        switch self {
+        case .charging: "charging"
+        case .unplugged: "unplugged"
+        case .fullyCharged: "fullyCharged"
+        case .lowBattery: "lowBattery"
+        case .nowPlaying: "nowPlaying"
+        case .call: "call"
+        case .meetingSoon: "meetingSoon"
+        }
     }
 }

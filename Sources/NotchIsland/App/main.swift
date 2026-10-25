@@ -4,7 +4,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controller: NotchController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Preferences.registerDefaults()
         controller = NotchController()
+    }
+
+    /// There's no Dock icon, so opening the app again from Finder or Spotlight shows Settings.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        AppWindows.shared.showSettings()
+        return false
     }
 }
 

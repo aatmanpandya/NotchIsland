@@ -20,6 +20,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp ".build/$EDITION/release/NotchIsland" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
+# Shipped inside the app so Settings and onboarding can point users to it.
+cp -R Extensions/Chrome "$APP/Contents/Resources/ChromeExtension"
 
 if [ "$EDITION" = direct ]; then
   clang -dynamiclib -fobjc-arc -O2 -Wall -arch arm64 -arch x86_64 -mmacosx-version-min=14.0 \
