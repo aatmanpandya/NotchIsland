@@ -2,12 +2,14 @@ import SwiftUI
 
 struct MediaPanel: View {
     @ObservedObject var media: MediaController
+    let namespace: Namespace.ID
 
     var body: some View {
         if let now = media.current {
             HStack(spacing: 16) {
                 Button { media.send(.focus) } label: {
                     ArtworkView(image: now.artwork, size: 104, corner: 18)
+                        .matchedGeometryEffect(id: IslandMotion.artworkID, in: namespace)
                         .shadow(color: media.tint.opacity(0.45), radius: 16, y: 6)
                         .scaleEffect(now.isPlaying ? 1 : 0.9)
                         .animation(.spring(response: 0.45, dampingFraction: 0.65), value: now.isPlaying)
@@ -190,6 +192,7 @@ struct PressScaleStyle: ButtonStyle {
 struct AudioBars: View {
     let isPlaying: Bool
     let color: Color
+    var height: CGFloat = 14
 
     private let speeds: [Double] = [5.1, 6.7, 4.3, 7.4]
 
@@ -201,10 +204,10 @@ struct AudioBars: View {
                     let level = isPlaying ? 0.3 + 0.7 * abs(sin(t * speeds[i] + Double(i) * 1.3)) : 0.2
                     Capsule()
                         .fill(LinearGradient(colors: [color, color.opacity(0.6)], startPoint: .top, endPoint: .bottom))
-                        .frame(width: 3, height: 14 * level)
+                        .frame(width: height / 4.5, height: height * level)
                 }
             }
-            .frame(height: 14)
+            .frame(height: height)
         }
     }
 }

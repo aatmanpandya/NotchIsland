@@ -15,15 +15,19 @@ extension NotchViewModel.Activity {
 struct ActivityView: View {
     @ObservedObject var vm: NotchViewModel
     let activity: NotchViewModel.Activity
+    let namespace: Namespace.ID
 
     var body: some View {
         let accent = activity.accent(media: vm.media)
         VStack(spacing: 0) {
-            // Top row: small "ears" on either side of the hardware notch.
+            // Top row, beside the hardware notch. The now-playing pop-up leaves it empty so the
+            // artwork and bars below aren't shown twice.
             HStack {
-                leadingEar.foregroundStyle(accent)
-                Spacer()
-                trailingEar.foregroundStyle(accent)
+                if activity != .nowPlaying {
+                    batteryIcon.foregroundStyle(accent)
+                    Spacer()
+                    Text("\(vm.battery.level)%").foregroundStyle(accent)
+                }
             }
             .font(.system(size: 13, weight: .bold).monospacedDigit())
             .frame(height: vm.notchSize.height)
@@ -39,19 +43,12 @@ struct ActivityView: View {
         .foregroundStyle(.white)
     }
 
-    @ViewBuilder private var leadingEar: some View {
+    @ViewBuilder private var batteryIcon: some View {
         switch activity {
         case .charging, .fullyCharged: Image(systemName: "bolt.fill").symbolEffect(.pulse)
         case .unplugged: Image(systemName: "powerplug.fill")
         case .lowBattery: Image(systemName: "exclamationmark.triangle.fill")
-        case .nowPlaying: ArtworkView(image: vm.media.current?.artwork, size: 20, corner: 5)
-        }
-    }
-
-    @ViewBuilder private var trailingEar: some View {
-        switch activity {
-        case .nowPlaying: AudioBars(isPlaying: true, color: vm.media.tint)
-        default: Text("\(vm.battery.level)%")
+        case .nowPlaying: EmptyView()
         }
     }
 
@@ -59,14 +56,13 @@ struct ActivityView: View {
         switch activity {
         case .nowPlaying:
             let now = vm.media.current
-            ArtworkView(image: now?.artwork, size: 38, corner: 9)
+            ArtworkView(image: now?.artwork, size: 40, corner: 10)
+                .matchedGeometryEffect(id: IslandMotion.artworkID, in: namespace)
                 .shadow(color: accent.opacity(0.5), radius: 8)
             titles(now?.title ?? "Now Playing", now?.artist ?? "")
             Spacer(minLength: 0)
-            Image(systemName: "waveform")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(accent)
-                .symbolEffect(.variableColor.iterative)
+            AudioBars(isPlaying: true, color: accent, height: 20)
+                .matchedGeometryEffect(id: IslandMotion.barsID, in: namespace)
         default:
             titles(batteryTitle, batterySubtitle)
             Spacer(minLength: 0)

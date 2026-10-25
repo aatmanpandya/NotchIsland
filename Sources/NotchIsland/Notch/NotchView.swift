@@ -1,11 +1,25 @@
 import ServiceManagement
 import SwiftUI
 
+/// Every animation setting for the island, in one place for tuning.
+enum IslandMotion {
+    /// The shape morphing between states. Slightly underdamped, so it "plops" like the iPhone's.
+    static let morph = Animation.spring(response: 0.45, dampingFraction: 0.7)
+    /// How long new content waits before fading in, so it lands after the shape starts growing.
+    static let contentDelay: TimeInterval = 0.06
+    /// Old content fades quickly so it never overlaps the new.
+    static let fadeOut = Animation.easeOut(duration: 0.1)
+    /// New content starts this much smaller and grows into place.
+    static let contentScale: CGFloat = 0.9
+
+    // Views that carry the same ID morph into each other instead of fading.
+    static let artworkID = "artwork"
+    static let barsID = "bars"
+}
+
 struct NotchView: View {
     @ObservedObject var vm: NotchViewModel
-
-    /// Slightly underdamped, so the island "plops" open like the iPhone's.
-    private let spring = Animation.spring(response: 0.45, dampingFraction: 0.7)
+    @Namespace private var island
 
     var body: some View {
         let mode = vm.mode
@@ -16,19 +30,19 @@ struct NotchView: View {
             switch mode {
             case .expanded:
                 // Laid out at full size and revealed by the growing shape, so nothing reflows mid-animation.
-                ExpandedView(vm: vm)
+                ExpandedView(vm: vm, namespace: island)
                     .frame(width: vm.expandedSize.width, height: vm.expandedSize.height)
                     .transition(contentTransition)
             case .activity(let activity):
-                ActivityView(vm: vm, activity: activity)
+                ActivityView(vm: vm, activity: activity, namespace: island)
                     .frame(width: size.width, height: size.height)
                     .transition(contentTransition)
                     .id(activity)
                     .onTapGesture { vm.isExpanded = true }
             case .collapsed:
-                CollapsedView(vm: vm)
+                CollapsedView(vm: vm, namespace: island)
                     .frame(width: size.width, height: size.height)
-                    .transition(.opacity.animation(.easeOut(duration: 0.15)))
+                    .transition(.opacity.animation(IslandMotion.fadeOut))
                     .onTapGesture { vm.isExpanded = true }
             }
         }
@@ -38,8 +52,8 @@ struct NotchView: View {
         .overlay { shape.stroke(.white.opacity(mode == .collapsed ? 0 : 0.08), lineWidth: 1) }
         .shadow(color: .black.opacity(mode == .collapsed ? 0 : 0.5), radius: 18, y: 8)
         .contextMenu { IslandMenu() }
-        .animation(spring, value: mode)
-        .animation(spring, value: vm.showsEars)
+        .animation(IslandMotion.morph, value: mode)
+        .animation(IslandMotion.morph, value: vm.showsEars)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
@@ -47,10 +61,10 @@ struct NotchView: View {
 
     private var contentTransition: AnyTransition {
         .asymmetric(
-            insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top))
+            insertion: .opacity.combined(with: .scale(scale: IslandMotion.contentScale, anchor: .top))
                 .combined(with: .offset(y: -6))
-                .animation(spring.delay(0.06)),
-            removal: .opacity.animation(.easeOut(duration: 0.1))
+                .animation(IslandMotion.morph.delay(IslandMotion.contentDelay)),
+            removal: .opacity.animation(IslandMotion.fadeOut)
         )
     }
 }
@@ -100,11 +114,13 @@ private struct IslandMenu: View {
 
 private struct CollapsedView: View {
     @ObservedObject var vm: NotchViewModel
+    let namespace: Namespace.ID
 
     var body: some View {
         HStack(spacing: 0) {
             if vm.showsEars {
                 ArtworkView(image: vm.media.current?.artwork, size: 22, corner: 6)
+                    .matchedGeometryEffect(id: IslandMotion.artworkID, in: namespace)
                     .shadow(color: vm.media.tint.opacity(0.6), radius: 6)
                     .frame(width: vm.earWidth)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
@@ -112,6 +128,7 @@ private struct CollapsedView: View {
             Color.clear.frame(width: vm.notchSize.width)
             if vm.showsEars {
                 AudioBars(isPlaying: true, color: vm.media.tint)
+                    .matchedGeometryEffect(id: IslandMotion.barsID, in: namespace)
                     .frame(width: vm.earWidth)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
             }
@@ -125,6 +142,7 @@ private struct CollapsedView: View {
 
 private struct ExpandedView: View {
     @ObservedObject var vm: NotchViewModel
+    let namespace: Namespace.ID
 
     var body: some View {
         let inset = vm.topRadius(for: .expanded) + 20
@@ -139,7 +157,7 @@ private struct ExpandedView: View {
             .padding(.horizontal, inset)
 
             HStack(spacing: 20) {
-                MediaPanel(media: vm.media)
+                MediaPanel(media: vm.media, namespace: namespace)
                 LinearGradient(colors: [.clear, .white.opacity(0.12), .clear], startPoint: .top, endPoint: .bottom)
                     .frame(width: 1)
                 ClockPanel(tint: vm.media.current == nil ? .white : vm.media.tint)
