@@ -229,17 +229,10 @@ final class NotchController {
     /// The same steps as macOS: a sixteenth per press, a quarter of that with Option-Shift.
     private func handleMediaKey(_ key: MediaKeyTap.Key, fine: Bool) {
         let step: Float = fine ? 1 / 64 : 1 / 16
-        switch key {
-        case .volumeUp, .volumeDown, .mute:
-            if key == .mute { volume.toggleMute() } else { volume.adjust(by: key == .volumeUp ? step : -step) }
-            // Shown here too, so a press at 0% or 100% (no change to report) still shows the bar.
-            if let reading = volume.current {
-                viewModel.showVolume(level: reading.level, muted: reading.isMuted, device: reading.deviceName)
-            }
-        case .brightnessUp:
-            brightness.adjust(by: step)
-        case .brightnessDown:
-            brightness.adjust(by: -step)
+        if key == .mute { volume.toggleMute() } else { volume.adjust(by: key == .volumeUp ? step : -step) }
+        // Shown here too, so a press at 0% or 100% (no change to report) still shows the bar.
+        if let reading = volume.current {
+            viewModel.showVolume(level: reading.level, muted: reading.isMuted, device: reading.deviceName)
         }
     }
     #endif

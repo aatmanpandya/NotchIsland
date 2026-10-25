@@ -8,10 +8,8 @@ final class BrightnessService {
     var onChange: ((Float) -> Void)?
 
     private typealias GetBrightness = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
-    private typealias SetBrightness = @convention(c) (CGDirectDisplayID, Float) -> Int32
 
     private let getBrightness: GetBrightness?
-    private let setBrightness: SetBrightness?
     private var timer: Timer?
     private var last: Float?
     /// Auto-brightness drifts in tiny steps; a key press jumps by about 6%.
@@ -20,7 +18,6 @@ final class BrightnessService {
     init() {
         let framework = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_NOW)
         getBrightness = dlsym(framework, "DisplayServicesGetBrightness").map { unsafeBitCast($0, to: GetBrightness.self) }
-        setBrightness = dlsym(framework, "DisplayServicesSetBrightness").map { unsafeBitCast($0, to: SetBrightness.self) }
         last = level
         // There's no change notification, so check four times a second.
         if getBrightness != nil {
@@ -32,15 +29,6 @@ final class BrightnessService {
         guard let getBrightness else { return nil }
         var value: Float = 0
         return getBrightness(Self.builtInDisplay, &value) == 0 ? value : nil
-    }
-
-    /// Moves brightness by `delta` (0...1 scale), like the brightness keys.
-    func adjust(by delta: Float) {
-        guard let setBrightness, let current = level else { return }
-        let next = min(1, max(0, current + delta))
-        _ = setBrightness(Self.builtInDisplay, next)
-        last = next
-        onChange?(next)
     }
 
     private func poll() {
@@ -57,11 +45,14 @@ final class BrightnessService {
     }
 }
 
-/// Takes over the volume and brightness keys so only the island's pop-up appears, not the
-/// system's. Direct edition only, opt-in, and it needs Accessibility permission.
+/// Takes over the volume keys so only the island's pop-up appears, not the system's. Direct
+/// edition only, opt-in, and it needs Accessibility permission.
+///
+/// Brightness keys are left to macOS: on macOS 27 the system undoes brightness changes made by
+/// apps within a fraction of a second, so taking those keys over would leave brightness stuck.
 final class MediaKeyTap {
     enum Key {
-        case volumeUp, volumeDown, mute, brightnessUp, brightnessDown
+        case volumeUp, volumeDown, mute
     }
 
     /// The key, and whether Option-Shift was held for a fine (quarter) step.
@@ -85,27 +76,16 @@ final class MediaKeyTap {
     @discardableResult
     func start() -> Bool {
         guard tap == nil else { return true }
-        // Media keys arrive as "system defined" events. Some Apple keyboards send brightness as
-        // ordinary key presses instead (key codes 144 and 145), so watch those too; every other
-        // key passes straight through. If macOS won't allow watching key presses, settle for
-        // media keys alone.
-        let mediaKeys = CGEventMask(1 << 14) // NSEvent.EventType.systemDefined
-        let withKeyPresses = mediaKeys
-            | CGEventMask(1 << CGEventType.keyDown.rawValue)
-            | CGEventMask(1 << CGEventType.keyUp.rawValue)
-        for (mask, name) in [(withKeyPresses, "media keys and key presses"), (mediaKeys, "media keys only")] {
-            if let tap = makeTap(mask) {
-                let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
-                CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-                CGEvent.tapEnable(tap: tap, enable: true)
-                self.tap = tap
-                runLoopSource = source
-                Self.isActive = true
-                DiagnosticsLog.write("Key takeover on (\(name)).")
-                return true
-            }
-        }
-        return false
+        // Media keys arrive as "system defined" events; every other key passes straight through.
+        guard let tap = makeTap(CGEventMask(1 << 14)) else { return false } // NSEvent.EventType.systemDefined
+        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        self.tap = tap
+        runLoopSource = source
+        Self.isActive = true
+        DiagnosticsLog.write("Volume key takeover on.")
+        return true
     }
 
     private func makeTap(_ mask: CGEventMask) -> CFMachPort? {
@@ -139,16 +119,6 @@ final class MediaKeyTap {
     /// True when the event was one of our keys and should be swallowed (both press and release,
     /// so the system pop-up never shows).
     private func handle(_ cgEvent: CGEvent) -> Bool {
-        if cgEvent.type == .keyDown || cgEvent.type == .keyUp {
-            let code = cgEvent.getIntegerValueField(.keyboardEventKeycode)
-            guard code == 144 || code == 145 else { return false }
-            if cgEvent.type == .keyDown { DiagnosticsLog.write("Brightness key seen as key code \(code).") }
-            if cgEvent.type == .keyDown {
-                let fine = cgEvent.flags.contains([.maskAlternate, .maskShift])
-                onKey?(code == 144 ? .brightnessUp : .brightnessDown, fine)
-            }
-            return true
-        }
         guard let event = NSEvent(cgEvent: cgEvent), event.subtype.rawValue == 8 else { return false }
         let keyCode = Int((event.data1 & 0xFFFF_0000) >> 16)
         let isDown = (event.data1 & 0xFF00) >> 8 == 0xA
@@ -158,12 +128,7 @@ final class MediaKeyTap {
         case 0: key = .volumeUp
         case 1: key = .volumeDown
         case 7: key = .mute
-        case 2: key = .brightnessUp
-        case 3: key = .brightnessDown
         default: return false
-        }
-        if isDown, key == .brightnessUp || key == .brightnessDown {
-            DiagnosticsLog.write("Brightness key seen as media key \(keyCode).")
         }
         if isDown {
             let fine = event.modifierFlags.contains([.option, .shift])

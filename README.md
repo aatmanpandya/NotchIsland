@@ -21,7 +21,7 @@ Prototype (v0.9). Working:
 - Stopwatch (Tools tab, next to the timer): laps, and it shows in the ears while running
 - Camera mirror (Tools tab): the camera runs only while the preview is showing
 - Bluetooth pop-up when AirPods or other devices connect; battery level in the direct edition
-- Volume pop-up (public Core Audio; off by default in the App Store edition, since macOS still shows its own) and, in the direct edition, brightness plus an option to take over the keys so the system pop-up never appears (needs Accessibility)
+- Volume pop-up (public Core Audio; off by default in the App Store edition, since macOS still shows its own) and, in the direct edition, brightness plus an option to take over the volume keys so the system volume pop-up never appears (needs Accessibility). Brightness keys stay with macOS, which on macOS 27 reverts brightness changes made by apps
 - Opt-in live visualizer: a Core Audio process tap and an FFT (Accelerate) drive the bars from the actual audio; nothing is recorded
 - Settings window (right-click the island, or open the app again from Finder): open at login, animation, album-art timing, haptics, each media source, each pop-up, meeting reminder timing, calendar access
 - First-run onboarding: welcome, media and the browser extension, calendar access, open at login
