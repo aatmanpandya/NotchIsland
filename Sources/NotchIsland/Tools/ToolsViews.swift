@@ -20,7 +20,13 @@ struct ToolsPanel: View {
 
 private struct TimerPanel: View {
     @ObservedObject var timer: TimerService
-    private let presets: [Int] = [1, 5, 10, 25]
+    @State private var hours = 0
+    @State private var minutes = 5
+    @State private var seconds = 0
+    private let quickPicks = [5, 10, 25]
+    private let wheelHeight: CGFloat = 132
+
+    private var total: TimeInterval { TimeInterval(hours * 3600 + minutes * 60 + seconds) }
 
     var body: some View {
         if timer.isActive {
@@ -48,31 +54,110 @@ private struct TimerPanel: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
         } else {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Timer", systemImage: "timer")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                HStack(spacing: 8) {
-                    ForEach(presets, id: \.self) { minutes in
-                        Button { timer.start(seconds: TimeInterval(minutes * 60)) } label: {
-                            VStack(spacing: 0) {
-                                Text("\(minutes)")
-                                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                                Text("min")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.6))
-                            }
-                            .frame(width: 58, height: 52)
-                            .islandGlass(in: RoundedRectangle(cornerRadius: 14, style: .continuous), interactive: true)
-                        }
-                        .buttonStyle(PressScaleStyle())
+            HStack(spacing: 16) {
+                // Like the iPhone Clock app: scroll each wheel, then press Start.
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(.white.opacity(0.1))
+                        .frame(height: WheelPicker.rowHeight)
+                    HStack(spacing: 4) {
+                        WheelPicker(values: 0..<24, selection: $hours, unit: "h", height: wheelHeight)
+                        WheelPicker(values: 0..<60, selection: $minutes, unit: "min", height: wheelHeight)
+                        WheelPicker(values: 0..<60, selection: $seconds, unit: "sec", height: wheelHeight)
                     }
                 }
-                Text("The countdown stays in the notch while it runs.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.5))
+                .frame(height: wheelHeight)
+
+                VStack(spacing: 12) {
+                    Button { timer.start(seconds: total) } label: {
+                        Text("Start")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(width: 64, height: 64)
+                            .background(Circle().fill(.orange))
+                            .shadow(color: .orange.opacity(0.45), radius: 10)
+                    }
+                    .buttonStyle(PressScaleStyle())
+                    .disabled(total == 0)
+                    .opacity(total == 0 ? 0.4 : 1)
+
+                    // Quick picks only set the wheels; nothing starts until Start.
+                    HStack(spacing: 4) {
+                        ForEach(quickPicks, id: \.self) { pick in
+                            Button {
+                                withAnimation(.spring(duration: 0.4, bounce: 0.2)) {
+                                    hours = 0
+                                    minutes = pick
+                                    seconds = 0
+                                }
+                            } label: {
+                                Text("\(pick)m")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .frame(width: 28, height: 20)
+                                    .background(Capsule().fill(.white.opacity(minutes == pick && hours == 0 && seconds == 0 ? 0.22 : 0.1)))
+                            }
+                            .buttonStyle(PressScaleStyle())
+                        }
+                    }
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+/// One scrolling wheel of numbers that snaps to a row. Rows tilt, shrink and fade with their
+/// distance from the center band, like the iOS picker.
+private struct WheelPicker: View {
+    let values: Range<Int>
+    @Binding var selection: Int
+    let unit: String
+    let height: CGFloat
+
+    static let rowHeight: CGFloat = 28
+    @State private var scrolledID: Int?
+
+    var body: some View {
+        HStack(spacing: 2) {
+            // Rows are measured against the wheel's own center on screen.
+            GeometryReader { wheel in
+                let centerY = wheel.frame(in: .global).midY
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(values, id: \.self) { value in
+                            Text("\(value)")
+                                .font(.system(size: 20, weight: .semibold, design: .rounded).monospacedDigit())
+                                .frame(width: 36, height: Self.rowHeight)
+                                .visualEffect { [height] content, proxy in
+                                    let offset = proxy.frame(in: .global).midY - centerY
+                                    let distance = min(1, abs(offset) / (height / 2))
+                                    return content
+                                        .rotation3DEffect(.degrees(Double(-offset / (height / 2)) * 50),
+                                                          axis: (x: 1, y: 0, z: 0))
+                                        .scaleEffect(1 - distance * 0.25)
+                                        .opacity(1 - distance * 0.75)
+                                }
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $scrolledID, anchor: .center)
+                // Lets the first and last values reach the center band.
+                .contentMargins(.vertical, (height - Self.rowHeight) / 2, for: .scrollContent)
+            }
+            .frame(width: 36, height: height)
+            .onAppear { scrolledID = selection }
+            .onChange(of: scrolledID) { _, value in
+                if let value, value != selection { selection = value }
+            }
+            .onChange(of: selection) { _, value in
+                if scrolledID != value { withAnimation { scrolledID = value } }
+            }
+            Text(unit)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+                .frame(width: 24, alignment: .leading)
         }
     }
 }
