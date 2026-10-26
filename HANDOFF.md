@@ -31,7 +31,7 @@ Repo: https://github.com/aatmanpandya/NotchIsland (public, MIT).
 
 ## Remaining plan
 
-1. **Owner:** create a free Apple Development certificate (Xcode → Settings → Accounts → Manage Certificates → + → Apple Development). Then do one final rebuild so permissions persist across builds; the build script picks the certificate up automatically.
+1. ~~**Owner:** create a free Apple Development certificate~~ Done 26 October 2026 (team ADJARMD687). The daily Direct build is signed with it, so permissions now survive rebuilds after one final re-grant.
 2. **Owner:** join the Apple Developer Program ($99/year) for Developer ID signing, notarization and App Store submission.
 3. **Notarize** the direct edition: set `SIGN_IDENTITY` (Developer ID Application) and `NOTARY_PROFILE` (`xcrun notarytool store-credentials`), run `./scripts/make-dmg.sh`, test the DMG on a clean user account.
 4. **First release:** `./scripts/release.sh 0.11.0`. Ask the owner before publishing. Verify Check for Updates finds it.
@@ -43,7 +43,8 @@ Repo: https://github.com/aatmanpandya/NotchIsland (public, MIT).
 
 ## Gotchas learned the hard way
 
-- **Permissions reset on every ad-hoc rebuild** (Accessibility, system audio, calendar, camera). Until the certificate exists, build test copies with `OUT=build/preview ./scripts/build-app.sh` so the owner's running copy keeps its identity.
+- **Permissions reset on every ad-hoc rebuild** (Accessibility, system audio, calendar, camera). Builds are now signed with the Apple Development certificate, which fixes this; `OUT=build/preview` is still handy for test copies.
+- **A new Apple Development certificate shows as invalid** until Apple's G3 intermediate (`AppleWWDRCAG3.cer`) is in the keychain. The first signed build asks for the login password once per signed part; click Always Allow.
 - **macOS 27 renamed Accessibility** to *Device Control and Data Access*. Re-granting means removing the app with **−** and adding it again, not toggling.
 - **macOS 27 reverts brightness set by apps** within about 0.3 s, so brightness keys must stay with macOS.
 - **The hardened runtime refuses Sparkle under ad-hoc signing** (different "developer"), so the build script turns it off for local builds without a certificate.
