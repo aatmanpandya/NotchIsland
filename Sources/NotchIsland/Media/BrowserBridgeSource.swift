@@ -79,7 +79,9 @@ final class BrowserBridgeSource: MediaSource {
         // Only the NotchIsland extension may connect: not web pages, and not other extensions.
         ws.setClientRequestHandler(.main) { _, headers in
             let origin = headers.first { $0.name.lowercased() == "origin" }?.value ?? ""
-            return NWProtocolWebSocket.Response(status: Self.allowedOrigins.contains(origin) ? .accept : .reject,
+            let allowed = Self.allowedOrigins.contains(origin)
+            if !allowed { DiagnosticsLog.write("Browser bridge turned away \(origin.isEmpty ? "a connection with no origin" : origin).") }
+            return NWProtocolWebSocket.Response(status: allowed ? .accept : .reject,
                                                 subprotocol: nil, additionalHeaders: nil)
         }
 
