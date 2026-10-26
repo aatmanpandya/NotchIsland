@@ -21,6 +21,10 @@ function connect() {
   socket.onopen = () => {
     retryDelay = 3000;
     sync();
+    // After a restart this worker has forgotten every tab; ask them all to report again.
+    chrome.tabs.query({}, (open) => {
+      for (const tab of open) chrome.tabs.sendMessage(tab.id, { type: "command", action: "resend" }).catch(() => {});
+    });
   };
   socket.onmessage = (event) => {
     try {

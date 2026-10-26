@@ -26,13 +26,19 @@ final class MediaController: ObservableObject {
     }
 
     func send(_ command: MediaCommand) {
-        guard let id = current?.sourceID else { return }
-        sources.first { $0.id == id }?.send(command)
+        guard let current else {
+            DiagnosticsLog.write("Media \(command): nothing playing to send it to.")
+            return
+        }
+        DiagnosticsLog.write("Media \(command) → \(current.sourceID) (\(current.appName), playing: \(current.isPlaying)).")
+        sources.first { $0.id == current.sourceID }?.send(command)
     }
 
     /// Prefer whatever is playing; otherwise stay on the last source shown.
     private func recompute() {
-        let snapshots = sources.filter { Preferences.isSourceEnabled($0.id) }.compactMap(\.snapshot)
+        let snapshots = Self.withoutSystemDuplicates(
+            sources.filter { Preferences.isSourceEnabled($0.id) }.compactMap(\.snapshot)
+        )
         let next = snapshots.first(where: \.isPlaying)
             ?? snapshots.first { $0.sourceID == current?.sourceID }
             ?? snapshots.first
@@ -42,6 +48,16 @@ final class MediaController: ObservableObject {
             tintArtworkID = next?.artworkID
             tint = next?.artwork?.accentColor.map(Color.init(nsColor:)) ?? .white
         }
+    }
+}
+
+extension MediaController {
+    /// The system-wide source also reports what the extension, Spotify and Music show. When both
+    /// describe the same title, keep the dedicated source: its controls work better (the system
+    /// path can't skip YouTube videos, for one).
+    static func withoutSystemDuplicates(_ snapshots: [PlaybackSnapshot]) -> [PlaybackSnapshot] {
+        let dedicatedTitles = Set(snapshots.filter { $0.sourceID != "system" }.map { $0.title.lowercased() })
+        return snapshots.filter { $0.sourceID != "system" || !dedicatedTitles.contains($0.title.lowercased()) }
     }
 }
 

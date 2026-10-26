@@ -101,14 +101,15 @@
     };
   }
 
-  // Send on every real change, plus a heartbeat while playing so the app's progress stays in sync.
+  // Send on every real change, plus a heartbeat: often while playing so progress stays in sync,
+  // and now and then while paused so the extension still knows about this tab after a restart.
   let lastKey = "";
   let lastSent = 0;
   function report(force = false) {
     const s = state();
     const { position, ...rest } = s || {};
     const key = JSON.stringify(s ? rest : null);
-    const heartbeat = s?.playing && Date.now() - lastSent > 5000;
+    const heartbeat = s && Date.now() - lastSent > (s.playing ? 5000 : 15000);
     if (!force && key === lastKey && !heartbeat) return;
     lastKey = key;
     lastSent = Date.now();
@@ -207,6 +208,9 @@
     if (event.source !== window || event.data?.__notchIsland !== "command") return;
     const el = currentMedia();
     switch (event.data.action) {
+      case "resend":
+        report(true);
+        return;
       case "toggle":
         if (!click(site.toggle) && el) el.paused ? el.play() : el.pause();
         break;

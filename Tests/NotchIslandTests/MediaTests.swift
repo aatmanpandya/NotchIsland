@@ -68,6 +68,27 @@ final class MediaControllerTests: XCTestCase {
         XCTAssertEqual(controller.current?.sourceID, "spotify")
     }
 
+    func testPausedVideoStaysWithTheExtensionNotTheSystemSource() {
+        let browser = FakeSource(id: "browser"), system = FakeSource(id: "system")
+        let controller = MediaController(sources: [browser, system])
+        browser.play("Some video")
+        system.play("Some video")
+        // Both report the pause; the system source happens to update last.
+        browser.play("Some video", playing: false)
+        system.play("Some video", playing: false)
+        XCTAssertEqual(controller.current?.sourceID, "browser")
+        controller.send(.next)
+        XCTAssertEqual(browser.commands.count, 1)
+        XCTAssertTrue(system.commands.isEmpty)
+    }
+
+    func testSystemSourceStillCoversOtherApps() {
+        let browser = FakeSource(id: "browser"), system = FakeSource(id: "system")
+        let controller = MediaController(sources: [browser, system])
+        system.play("A podcast in another app")
+        XCTAssertEqual(controller.current?.sourceID, "system")
+    }
+
     func testCommandsGoToTheSourceBeingShown() {
         let browser = FakeSource(id: "browser"), spotify = FakeSource(id: "spotify")
         let controller = MediaController(sources: [browser, spotify])

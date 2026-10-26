@@ -229,7 +229,11 @@ final class BrowserBridgeSource: MediaSource {
     // MARK: - Commands
 
     func send(_ command: MediaCommand) {
-        guard let selected, let connection = browsers[selected.browser]?.connection else { return }
+        guard let selected, let connection = browsers[selected.browser]?.connection else {
+            DiagnosticsLog.write("Browser \(command): no connected tab to send it to.")
+            return
+        }
+        DiagnosticsLog.write("Browser \(command) → tab \(selected.tabId), connection \(connection.state).")
         var payload: [String: Any] = ["type": "command", "tabId": selected.tabId]
         switch command {
         case .togglePlayPause: payload["action"] = "toggle"
