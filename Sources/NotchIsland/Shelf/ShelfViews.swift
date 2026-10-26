@@ -111,6 +111,9 @@ private struct ShelfTile: View {
             Button("Remove from Shelf") { shelf.remove(item) }
         }
         .help(item.name)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.name)
+        .accessibilityHint("Drag to move it into an app or folder; double-click to open")
     }
 }
 

@@ -45,14 +45,14 @@ final class BrightnessService {
     }
 }
 
-/// Takes over the volume keys so only the island's pop-up appears, not the system's. Direct
-/// edition only, opt-in, and it needs Accessibility permission.
+/// Takes over the volume up and down keys so only the island's pop-up appears, not the system's.
+/// Direct edition only, opt-in, and it needs Accessibility permission.
 ///
-/// Brightness keys are left to macOS: on macOS 27 the system undoes brightness changes made by
-/// apps within a fraction of a second, so taking those keys over would leave brightness stuck.
+/// Every other key goes to macOS untouched: mute, play/pause, and brightness (on macOS 27 the
+/// system undoes brightness changes made by apps, so taking those keys over left them stuck).
 final class MediaKeyTap {
     enum Key {
-        case volumeUp, volumeDown, mute
+        case volumeUp, volumeDown
     }
 
     /// The key, and whether Option-Shift was held for a fine (quarter) step.
@@ -122,15 +122,17 @@ final class MediaKeyTap {
         guard let event = NSEvent(cgEvent: cgEvent), event.subtype.rawValue == 8 else { return false }
         let keyCode = Int((event.data1 & 0xFFFF_0000) >> 16)
         let isDown = (event.data1 & 0xFF00) >> 8 == 0xA
-        // NX_KEYTYPE_* values from IOKit's ev_keymap.h.
+        // NX_KEYTYPE_* values from IOKit's ev_keymap.h: 0 is volume up, 1 volume down.
         let key: Key
         switch keyCode {
         case 0: key = .volumeUp
         case 1: key = .volumeDown
-        case 7: key = .mute
-        default: return false
+        default:
+            if isDown { DiagnosticsLog.write("Media key \(keyCode) passed to macOS.") }
+            return false
         }
         if isDown {
+            DiagnosticsLog.write("Media key \(keyCode) handled by the island.")
             let fine = event.modifierFlags.contains([.option, .shift])
             onKey?(key, fine)
         }

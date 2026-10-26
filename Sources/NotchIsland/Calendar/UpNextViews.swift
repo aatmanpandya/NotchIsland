@@ -3,12 +3,15 @@ import SwiftUI
 /// The right side of the expanded island: the next event, with a Join button for video calls.
 struct UpNextPanel: View {
     @ObservedObject var calendar: CalendarService
+    /// Keeps the island open while the permission prompt is up.
+    var holdOpen: (Bool) -> Void = { _ in }
 
     var body: some View {
         switch calendar.access {
         case .notDetermined:
             prompt(symbol: "calendar", title: "See your next meeting", action: "Allow Calendar Access") {
-                calendar.requestAccess()
+                holdOpen(true)
+                calendar.requestAccess { holdOpen(false) }
             }
         case .denied:
             prompt(symbol: "calendar.badge.exclamationmark", title: "Calendar access is off", action: "Open Settings") {

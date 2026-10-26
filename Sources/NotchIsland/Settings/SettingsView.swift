@@ -192,7 +192,7 @@ private struct VolumeBrightnessSettings: View {
             Text("Volume and brightness")
         } footer: {
             #if DIRECT_DISTRIBUTION
-            Text("Hiding the system pop-up lets NotchIsland handle the volume keys itself; macOS asks for Accessibility permission to allow it. Brightness keys stay with macOS, which keeps showing its own brightness pop-up.")
+            Text("Hiding the system pop-up lets NotchIsland handle the volume up and down keys itself; macOS asks for Accessibility permission to allow it. Mute, play/pause and brightness always stay with macOS.")
             #else
             Text("macOS still shows its own volume pop-up as well.")
             #endif

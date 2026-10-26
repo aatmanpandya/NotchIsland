@@ -35,11 +35,6 @@ final class VolumeService {
         if reading.isMuted { setMute(false) }
     }
 
-    func toggleMute() {
-        guard let reading = read() else { return }
-        setMute(!reading.isMuted)
-    }
-
     // MARK: - Listening
 
     private func attachToDefaultDevice() {

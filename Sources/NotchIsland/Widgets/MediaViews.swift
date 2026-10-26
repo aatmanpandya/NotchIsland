@@ -16,6 +16,7 @@ struct MediaPanel: View {
                 }
                 .buttonStyle(PressScaleStyle())
                 .help("Open \(now.appName)")
+                .accessibilityLabel("Open \(now.appName)")
 
                 VStack(alignment: .leading, spacing: 2) {
                     Label(now.appName, systemImage: now.sourceID == "browser" ? "play.rectangle.fill" : "music.note")
@@ -36,10 +37,12 @@ struct MediaPanel: View {
                         ControlButton(symbol: "backward.fill", size: 16, enabled: now.canSkip || now.canSeek) {
                             media.send(.previous)
                         }
+                        .accessibilityLabel("Previous track")
                         PlayButton(isPlaying: now.isPlaying) { media.send(.togglePlayPause) }
                         ControlButton(symbol: "forward.fill", size: 16, enabled: now.canSkip) {
                             media.send(.next)
                         }
+                        .accessibilityLabel("Next track")
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -159,6 +162,7 @@ private struct PlayButton: View {
                 .shadow(color: .white.opacity(0.2), radius: 8)
         }
         .buttonStyle(PressScaleStyle())
+        .accessibilityLabel(isPlaying ? "Pause" : "Play")
     }
 }
 

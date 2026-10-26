@@ -54,11 +54,12 @@ final class CalendarService: ObservableObject {
     var later: Meeting? { meetings.dropFirst().first }
 
     /// Asks only when the user taps the button in the panel, never at launch.
-    func requestAccess() {
+    func requestAccess(completion: (() -> Void)? = nil) {
         store.requestFullAccessToEvents { [weak self] _, _ in
             DispatchQueue.main.async {
                 self?.access = Self.currentAccess()
                 self?.reload()
+                completion?()
             }
         }
     }

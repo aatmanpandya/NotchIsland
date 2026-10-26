@@ -17,7 +17,7 @@ final class NotchViewModel: ObservableObject {
         case brightness
     }
 
-    enum Tab: CaseIterable {
+    enum Tab: String, CaseIterable {
         case home
         case shelf
         case tools
@@ -48,11 +48,18 @@ final class NotchViewModel: ObservableObject {
         case expanded
     }
 
-    @Published var isExpanded = false {
-        // Each time the island opens, it starts on Home.
-        didSet { if !isExpanded { tab = .home } }
+    @Published var isExpanded = false
+    /// The island reopens on the tab it was last on, even after a restart.
+    @Published var tab: Tab = Tab(rawValue: UserDefaults.standard.string(forKey: "lastTab") ?? "") ?? .home {
+        didSet { UserDefaults.standard.set(tab.rawValue, forKey: "lastTab") }
     }
-    @Published var tab: Tab = .home
+    /// Keeps the island open while the user answers a macOS permission prompt, which takes the
+    /// mouse away from it.
+    @Published private(set) var isHeldOpen = false
+
+    func holdOpen(_ hold: Bool) {
+        isHeldOpen = hold
+    }
     /// The device announced by the most recent connection pop-up.
     @Published private(set) var connectedDevice: BluetoothService.Device?
     /// The level shown by the volume or brightness pop-up (0...1).

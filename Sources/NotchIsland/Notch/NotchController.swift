@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// A borderless panel that sits over the notch, above the menu bar, on every Space.
@@ -38,6 +39,7 @@ final class NotchController {
     private var pendingToggle: DispatchWorkItem?
     /// Set by preview mode, so hovering doesn't change the pinned state.
     private var isPinned = false
+    private var holdObserver: AnyCancellable?
 
     // Spotting a file being dragged from another app: the drag pasteboard changes after the
     // mouse goes down, and it holds file URLs.
@@ -105,6 +107,10 @@ final class NotchController {
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in self?.updateKeyTakeover() }
         #endif
+
+        // Once a permission prompt is answered, close the island if the mouse has moved away.
+        holdObserver = viewModel.$isHeldOpen.dropFirst().filter { !$0 }
+            .sink { [weak self] _ in DispatchQueue.main.async { self?.trackMouse() } }
 
         AppWindows.shared.calendar = viewModel.calendar
         AppWindows.shared.onOnboardingFinished = { [weak viewModel] in viewModel?.demo() }
@@ -177,6 +183,13 @@ final class NotchController {
         let inside = islandRect(for: viewModel.mode).insetBy(dx: -slop, dy: -slop).contains(mouse)
         panel.ignoresMouseEvents = !inside
 
+        // While a permission prompt is up, the open island waits for the answer.
+        if expanded, viewModel.isHeldOpen {
+            pendingToggle?.cancel()
+            pendingToggle = nil
+            return
+        }
+
         // A pop-up with buttons (Dismiss, Join, Low Power Mode) stays a pop-up under the cursor,
         // so the click reaches its buttons instead of opening the full panel.
         if inside, !expanded, viewModel.activityIsInteractive {
@@ -229,7 +242,7 @@ final class NotchController {
     /// The same steps as macOS: a sixteenth per press, a quarter of that with Option-Shift.
     private func handleMediaKey(_ key: MediaKeyTap.Key, fine: Bool) {
         let step: Float = fine ? 1 / 64 : 1 / 16
-        if key == .mute { volume.toggleMute() } else { volume.adjust(by: key == .volumeUp ? step : -step) }
+        volume.adjust(by: key == .volumeUp ? step : -step)
         // Shown here too, so a press at 0% or 100% (no change to report) still shows the bar.
         if let reading = volume.current {
             viewModel.showVolume(level: reading.level, muted: reading.isMuted, device: reading.deviceName)

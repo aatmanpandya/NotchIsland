@@ -84,6 +84,8 @@ struct NotchView: View {
         .overlay(alignment: .topTrailing) {
             if mode == .collapsed, vm.showsTimerBubble {
                 TimerBubble(timer: vm.timer, stopwatch: vm.stopwatch, size: vm.notchSize.height)
+                    .accessibilityLabel(vm.timer.isActive ? "Timer" : "Stopwatch")
+                    .accessibilityAddTraits(.isButton)
                     .offset(x: vm.notchSize.height + 6)
                     .transition(.scale(scale: 0.3, anchor: .leading).combined(with: .opacity))
                     .onTapGesture {
@@ -283,13 +285,13 @@ private struct ExpandedView: View {
                         MediaPanel(media: vm.media, namespace: namespace)
                         LinearGradient(colors: [.clear, .white.opacity(0.12), .clear], startPoint: .top, endPoint: .bottom)
                             .frame(width: 1)
-                        UpNextPanel(calendar: vm.calendar)
+                        UpNextPanel(calendar: vm.calendar) { vm.holdOpen($0) }
                             .frame(width: 168, alignment: .leading)
                     }
                 case .shelf:
                     ShelfPanel(shelf: vm.shelf, isTargeted: isDropTargeted)
                 case .tools:
-                    ToolsPanel(timer: vm.timer, stopwatch: vm.stopwatch)
+                    ToolsPanel(timer: vm.timer, stopwatch: vm.stopwatch) { vm.holdOpen($0) }
                 }
             }
             .id(vm.tab)
@@ -337,6 +339,8 @@ private struct TabPills: View {
                     .contentShape(Capsule())
                 }
                 .buttonStyle(PressScaleStyle())
+                .accessibilityLabel(tab.title)
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
     }

@@ -4,7 +4,7 @@ A Dynamic Island–style companion for the MacBook notch. Hover the notch to exp
 
 ## Status
 
-Prototype (v0.9). Working:
+Prototype (v0.10). Working:
 
 - Notch overlay that expands on hover with a spring animation
 - Liquid Glass design (macOS 26+): solid black where it meets the notch, fading into dark glass with the artwork's color glowing through; frosted blur on macOS 14–15
@@ -21,7 +21,7 @@ Prototype (v0.9). Working:
 - Stopwatch (Tools tab, next to the timer): laps, and it shows in the ears while running
 - Camera mirror (Tools tab): the camera runs only while the preview is showing
 - Bluetooth pop-up when AirPods or other devices connect; battery level in the direct edition
-- Volume pop-up (public Core Audio; off by default in the App Store edition, since macOS still shows its own) and, in the direct edition, brightness plus an option to take over the volume keys so the system volume pop-up never appears (needs Accessibility). Brightness keys stay with macOS, which on macOS 27 reverts brightness changes made by apps
+- Volume pop-up (public Core Audio; off by default in the App Store edition, since macOS still shows its own) and, in the direct edition, brightness plus an option to take over the volume up and down keys so the system volume pop-up never appears (needs Accessibility). Mute, play/pause and brightness always stay with macOS; on macOS 27 the system reverts brightness changes made by apps
 - Opt-in live visualizer: a Core Audio process tap and an FFT (Accelerate) drive the bars from the actual audio; nothing is recorded
 - Settings window (right-click the island, or open the app again from Finder): open at login, animation, album-art timing, haptics, each media source, each pop-up, meeting reminder timing, calendar access
 - First-run onboarding: welcome, media and the browser extension, calendar access, open at login
@@ -58,7 +58,23 @@ open --env NOTCHISLAND_PREVIEW=expanded build/NotchIsland.app
 2. Click **Load unpacked** and choose the `Extensions/Chrome` folder.
 3. Reload any tabs that were already open.
 
-The extension talks to the app over a WebSocket on `127.0.0.1:47823`. The app only accepts connections from this Mac and from browser-extension origins, never from web pages.
+The extension talks to the app over a WebSocket on `127.0.0.1:47823`. The app only accepts connections from this Mac, and only from the NotchIsland extension: its ID is fixed by the public key in `manifest.json`, and the app checks the connection's origin against it.
+
+## Tests
+
+```bash
+swift test -Xswiftc -DDIRECT_DISTRIBUTION
+```
+
+Covers playback position and optimistic updates, which source the island shows, the timer and stopwatch, time formatting, video-call link detection and meeting countdowns.
+
+## App icon
+
+Drawn in code by `scripts/make-icon.swift`, which writes `Resources/AppIcon.icns`:
+
+```bash
+swift scripts/make-icon.swift && iconutil -c icns build/AppIcon.iconset -o Resources/AppIcon.icns
+```
 
 ## Architecture
 

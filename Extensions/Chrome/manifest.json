@@ -3,17 +3,28 @@
   "name": "NotchIsland Bridge",
   "version": "0.1.0",
   "description": "Shows what's playing in your browser on the NotchIsland notch app for Mac.",
-  "background": { "service_worker": "background.js" },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiP4FGsH+DMyTZY8vBp37hOIpJs+4T9+PzppPcZBT8i4hgn8JzQzG88Wa7ujeErr8o6vd1DK8MlWkS4Jkr2XpG/sb45elUsjHKetRGJytzSBdTkRAUuEzN1906wPG00ggB/mvtfMzWdXN6fGFWqngzc/IgMdJwQMxjfZRTi+e0/gUozFOA04dLmjA0w6RfZvekeRNPe3LAsejcoXbLxEPIr3aVA5N9tJ9hFmE/6x2W38Z6wv9IG9CPZLxcB9rqKoUHrqVp9GE4NtQJ5NK+H6Zm36ECykHJD8isxfSP3JRKurhK81FW+jzhe4f+8C+QD4Shn0JVtl8MufgM2sqWvIczQIDAQAB",
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["page.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "page.js"
+      ],
       "world": "MAIN",
       "run_at": "document_start"
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["relay.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "relay.js"
+      ],
       "run_at": "document_start"
     }
   ]

@@ -6,6 +6,12 @@ import Network
 final class BrowserBridgeSource: MediaSource {
     static let port: UInt16 = 47_823
 
+    /// The extension's ID is fixed by the public key in its manifest. Add the Chrome Web Store
+    /// ID here once it's published there.
+    static let allowedOrigins: Set<String> = [
+        "chrome-extension://fjhaakdelmjpbelljbjggikdioknjkmg",
+    ]
+
     let id = "browser"
     var onChange: (() -> Void)?
     private(set) var snapshot: PlaybackSnapshot? {
@@ -70,12 +76,10 @@ final class BrowserBridgeSource: MediaSource {
     private func start() {
         let ws = NWProtocolWebSocket.Options()
         ws.autoReplyPing = true
-        // Only browser extensions may connect, not web pages.
+        // Only the NotchIsland extension may connect: not web pages, and not other extensions.
         ws.setClientRequestHandler(.main) { _, headers in
             let origin = headers.first { $0.name.lowercased() == "origin" }?.value ?? ""
-            let allowed = ["chrome-extension://", "moz-extension://", "safari-web-extension://"]
-                .contains { origin.hasPrefix($0) }
-            return NWProtocolWebSocket.Response(status: allowed ? .accept : .reject,
+            return NWProtocolWebSocket.Response(status: Self.allowedOrigins.contains(origin) ? .accept : .reject,
                                                 subprotocol: nil, additionalHeaders: nil)
         }
 

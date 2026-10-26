@@ -5,6 +5,8 @@ import SwiftUI
 struct ToolsPanel: View {
     @ObservedObject var timer: TimerService
     @ObservedObject var stopwatch: StopwatchService
+    /// Keeps the island open while the camera permission prompt is up.
+    var holdOpen: (Bool) -> Void = { _ in }
     @AppStorage("toolsClockMode") private var mode: ClockMode = .timer
 
     var body: some View {
@@ -23,7 +25,7 @@ struct ToolsPanel: View {
             }
             LinearGradient(colors: [.clear, .white.opacity(0.12), .clear], startPoint: .top, endPoint: .bottom)
                 .frame(width: 1)
-            MirrorPanel()
+            MirrorPanel(holdOpen: holdOpen)
                 .frame(width: 180)
         }
     }
@@ -290,6 +292,17 @@ private struct ClockButton: View {
             .opacity(isEnabled ? 1 : 0.4)
         }
         .buttonStyle(PressScaleStyle())
+        .accessibilityLabel(spokenName)
+    }
+
+    private var spokenName: String {
+        if let title { return title }
+        switch symbol {
+        case "xmark": return "Cancel"
+        case "play.fill": return "Start"
+        case "pause.fill": return "Pause"
+        default: return symbol ?? ""
+        }
     }
 }
 
@@ -436,6 +449,7 @@ private struct StopwatchPanel: View {
 // MARK: - Mirror
 
 private struct MirrorPanel: View {
+    let holdOpen: (Bool) -> Void
     @State private var isOn = false
     @State private var access = AVCaptureDevice.authorizationStatus(for: .video)
 
@@ -488,10 +502,12 @@ private struct MirrorPanel: View {
     /// Asks for the camera the first time; the camera runs only while the preview is on screen.
     private func turnOn() {
         if access == .notDetermined {
+            holdOpen(true)
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
                     access = AVCaptureDevice.authorizationStatus(for: .video)
                     isOn = granted
+                    holdOpen(false)
                 }
             }
         } else {

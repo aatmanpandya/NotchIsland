@@ -20,6 +20,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp ".build/$EDITION/release/NotchIsland" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 # Shipped inside the app so Settings and onboarding can point users to it.
 cp -R Extensions/Chrome "$APP/Contents/Resources/ChromeExtension"
 
