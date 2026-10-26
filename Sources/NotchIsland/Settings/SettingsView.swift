@@ -32,7 +32,7 @@ private struct GeneralSettings: View {
             Section {
                 LoginItemToggle()
             }
-            Section("Island") {
+            Section {
                 Picker("Animation", selection: $style) {
                     ForEach(MotionStyle.allCases) { Text($0.title).tag($0) }
                 }
@@ -44,6 +44,11 @@ private struct GeneralSettings: View {
                     Text("The whole time it plays").tag(-1)
                 }
                 Toggle("Haptic feedback when it opens", isOn: $haptics)
+                LabeledContent("Open from the keyboard", value: "⌃⌥⌘N")
+            } header: {
+                Text("Island")
+            } footer: {
+                Text("The shortcut opens the island and moves focus into it, for VoiceOver and Tab. Esc closes it.")
             }
             Section {
                 Toggle("Live visualizer", isOn: $liveVisualizer)

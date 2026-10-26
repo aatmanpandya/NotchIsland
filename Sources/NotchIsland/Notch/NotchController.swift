@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import SwiftUI
 
@@ -40,6 +41,13 @@ final class NotchController {
     /// Set by preview mode, so hovering doesn't change the pinned state.
     private var isPinned = false
     private var holdObserver: AnyCancellable?
+
+    // Opening from the keyboard (⌃⌥⌘N) makes the island the active window, so VoiceOver and
+    // Tab can reach it; Esc, the shortcut again, or clicking elsewhere closes it.
+    private var shortcut: GlobalShortcut?
+    private var isKeyboardSession = false
+    private var appBeforeKeyboardSession: NSRunningApplication?
+    private var keyboardMonitors: [Any] = []
 
     // Spotting a file being dragged from another app: the drag pasteboard changes after the
     // mouse goes down, and it holds file URLs.
@@ -112,6 +120,17 @@ final class NotchController {
         holdObserver = viewModel.$isHeldOpen.dropFirst().filter { !$0 }
             .sink { [weak self] _ in DispatchQueue.main.async { self?.trackMouse() } }
 
+        shortcut = GlobalShortcut(keyCode: kVK_ANSI_N, modifiers: controlKey | optionKey | cmdKey) { [weak self] in
+            self?.toggleKeyboardSession()
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
+        ) { [weak self] _ in
+            // Clicking another app ends the session; that app already has focus.
+            if self?.isKeyboardSession == true { self?.endKeyboardSession(restoreFocus: false) }
+        }
+        panel.setAccessibilityLabel("NotchIsland")
+
         AppWindows.shared.calendar = viewModel.calendar
         AppWindows.shared.onOnboardingFinished = { [weak viewModel] in viewModel?.demo() }
         if !isPinned, !UserDefaults.standard.bool(forKey: Preferences.Key.hasOnboarded) {
@@ -183,6 +202,14 @@ final class NotchController {
         let inside = islandRect(for: viewModel.mode).insetBy(dx: -slop, dy: -slop).contains(mouse)
         panel.ignoresMouseEvents = !inside
 
+        // Opened from the keyboard: stays open and clickable wherever the mouse is.
+        if isKeyboardSession {
+            panel.ignoresMouseEvents = false
+            pendingToggle?.cancel()
+            pendingToggle = nil
+            return
+        }
+
         // While a permission prompt is up, the open island waits for the answer.
         if expanded, viewModel.isHeldOpen {
             pendingToggle?.cancel()
@@ -249,6 +276,40 @@ final class NotchController {
         }
     }
     #endif
+
+    private func toggleKeyboardSession() {
+        isKeyboardSession ? endKeyboardSession(restoreFocus: true) : startKeyboardSession()
+    }
+
+    private func startKeyboardSession() {
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        appBeforeKeyboardSession = frontmost?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : frontmost
+        isKeyboardSession = true
+        pendingToggle?.cancel()
+        pendingToggle = nil
+        panel.ignoresMouseEvents = false
+        setExpanded(true)
+        NSApp.activate()
+        panel.makeKeyAndOrderFront(nil)
+        NSAccessibility.post(element: panel, notification: .focusedWindowChanged)
+
+        if let escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
+            guard event.keyCode == UInt16(kVK_Escape), self?.isKeyboardSession == true else { return event }
+            self?.endKeyboardSession(restoreFocus: true)
+            return nil
+        }) { keyboardMonitors.append(escape) }
+    }
+
+    private func endKeyboardSession(restoreFocus: Bool) {
+        guard isKeyboardSession else { return }
+        isKeyboardSession = false
+        keyboardMonitors.forEach(NSEvent.removeMonitor)
+        keyboardMonitors.removeAll()
+        setExpanded(false)
+        if restoreFocus { appBeforeKeyboardSession?.activate() }
+        appBeforeKeyboardSession = nil
+        trackMouse()
+    }
 
     private func setExpanded(_ expanded: Bool) {
         guard viewModel.isExpanded != expanded else { return }
