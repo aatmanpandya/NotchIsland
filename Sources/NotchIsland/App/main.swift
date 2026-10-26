@@ -6,6 +6,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Preferences.registerDefaults()
         controller = NotchController()
+        #if DIRECT_DISTRIBUTION && canImport(Sparkle)
+        _ = Updater.shared
+        #endif
     }
 
     /// There's no Dock icon, so opening the app again from Finder or Spotlight shows Settings.

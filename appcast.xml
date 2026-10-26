@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Update feed for the direct-download edition, read by Sparkle. Maintained by scripts/release.sh. -->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>NotchIsland</title>
+    <link>https://github.com/aatmanpandya/NotchIsland</link>
+    <description>Updates for NotchIsland</description>
+    <language>en</language>
+    <!-- Releases are added below, newest first. -->
+  </channel>
+</rss>

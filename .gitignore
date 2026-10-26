@@ -6,3 +6,4 @@ DerivedData/
 xcuserdata/
 .build/test/
 NotchIsland.xcodeproj/
+Resources/Generated/

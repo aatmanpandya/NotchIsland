@@ -4,7 +4,7 @@ A Dynamic Island–style companion for the MacBook notch. Hover the notch to exp
 
 ## Status
 
-Prototype (v0.10). Working:
+Prototype (v0.11). Working:
 
 - Notch overlay that expands on hover with a spring animation
 - Liquid Glass design (macOS 26+): solid black where it meets the notch, fading into dark glass with the artwork's color glowing through; frosted blur on macOS 14–15
@@ -16,7 +16,7 @@ Prototype (v0.10). Working:
 - Up next: your next calendar event with a countdown and a Join button for Meet, Zoom, Teams and other call links; a reminder pop-up 5 minutes before each meeting
 - Call-started pop-up for browser video calls
 - Tabs in the expanded island: Home (player and Up next), Shelf, and Tools
-- File shelf: drag files toward the notch to park them; kept as links (no extra disk space) until cleared; drag out, open, Show in Finder, AirDrop
+- File shelf: drag files toward the notch to park them; kept as links (no extra disk space) until cleared; drag out, open, Show in Finder. An AirDrop zone beside it sends dropped files straight away, or the whole shelf with a click
 - Timer (Tools tab, iPhone Clock layout): scroll wheels, cancel and start, a label and an alert sound; lives in the ears or in a separate bubble while music plays; +1 min / Dismiss pop-up when done; survives restarts
 - Stopwatch (Tools tab, next to the timer): laps, and it shows in the ears while running
 - Camera mirror (Tools tab): the camera runs only while the preview is showing
@@ -63,6 +63,19 @@ open --env NOTCHISLAND_PREVIEW=expanded build/NotchIsland.app
 3. Reload any tabs that were already open.
 
 The extension talks to the app over a WebSocket on `127.0.0.1:47823`. The app only accepts connections from this Mac, and only from the NotchIsland extension: its ID is fixed by the public key in `manifest.json`, and the app checks the connection's origin against it.
+
+## Releases and updates (direct edition)
+
+The direct edition updates itself with [Sparkle](https://sparkle-project.org): it reads `appcast.xml` from this repository and installs only updates signed with the private key in the maintainer's Keychain (the public half is in its Info.plist). The App Store edition is updated by the App Store and contains no updater.
+
+```bash
+./scripts/make-dmg.sh          # build/NotchIsland-<version>.dmg, the drag-to-Applications installer
+./scripts/release.sh 0.11.0    # bump the version, build the DMG, sign it, publish a GitHub release, update appcast.xml
+```
+
+Builds for testing can go elsewhere so they don't replace the copy you're running (and its permissions): `OUT=build/preview ./scripts/build-app.sh`.
+
+Notarization needs an Apple Developer Program membership: set `SIGN_IDENTITY` to the Developer ID Application certificate and `NOTARY_PROFILE` to a profile saved with `xcrun notarytool store-credentials`.
 
 ## Tests
 

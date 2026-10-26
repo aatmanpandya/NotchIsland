@@ -201,6 +201,9 @@ private struct IslandMenu: View {
 
     var body: some View {
         Button("Settings…") { AppWindows.shared.showSettings() }
+        #if DIRECT_DISTRIBUTION && canImport(Sparkle)
+        Button("Check for Updates…") { Updater.shared.checkForUpdates() }
+        #endif
         Picker("Animation", selection: $style) {
             ForEach(MotionStyle.allCases) { Text($0.title).tag($0) }
         }

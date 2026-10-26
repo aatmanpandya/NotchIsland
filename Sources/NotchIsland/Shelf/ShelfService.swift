@@ -61,7 +61,14 @@ final class ShelfService: ObservableObject {
     }
 
     func airDrop(_ items: [ShelfItem]) {
-        NSSharingService(named: .sendViaAirDrop)?.perform(withItems: items.map(\.url))
+        airDrop(urls: items.map(\.url))
+    }
+
+    func airDrop(urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        // The app has no Dock icon, so bring the AirDrop picker forward.
+        NSApp.activate()
+        NSSharingService(named: .sendViaAirDrop)?.perform(withItems: urls)
     }
 
     /// Follows files that moved since they were shelved, and drops ones that were deleted.

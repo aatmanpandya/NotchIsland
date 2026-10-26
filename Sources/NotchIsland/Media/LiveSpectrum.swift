@@ -14,20 +14,28 @@ final class LiveSpectrum: ObservableObject {
 
     private var engine: AnyObject?
 
-    /// Runs only while the user has it on and something is playing.
+    private var isPlaying = false
+
+    /// Starts listening the first time something plays with the visualizer on, then keeps the
+    /// tap open until it's switched off. Starting a tap is what triggers macOS's permission
+    /// prompt, so this asks at most once per launch instead of on every play.
     func update(enabled: Bool, isPlaying: Bool) {
-        let shouldRun = enabled && isPlaying
+        self.isPlaying = isPlaying
         guard #available(macOS 14.2, *) else { return }
-        if shouldRun, engine == nil {
+        if enabled, isPlaying, engine == nil {
             let tap = SystemAudioTap { [weak self] levels in
-                DispatchQueue.main.async { self?.bands = levels }
+                DispatchQueue.main.async {
+                    guard let self, self.isPlaying else { return }
+                    self.bands = levels
+                }
             }
             if tap.start() { engine = tap }
-        } else if !shouldRun, let tap = engine as? SystemAudioTap {
+        } else if !enabled, let tap = engine as? SystemAudioTap {
             tap.stop()
             engine = nil
-            bands = nil
         }
+        // While nothing plays (or it's off), the bars go back to their decorative motion.
+        if !enabled || !isPlaying { bands = nil }
     }
 }
 

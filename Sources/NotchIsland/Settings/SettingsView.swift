@@ -265,6 +265,9 @@ private struct AboutSettings: View {
                 .foregroundStyle(.secondary)
             Button("Show Welcome Again") { AppWindows.shared.showOnboarding() }
                 .padding(.top, 8)
+            #if DIRECT_DISTRIBUTION && canImport(Sparkle)
+            UpdateControls(updater: .shared)
+            #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -281,6 +284,24 @@ private struct AboutSettings: View {
         #endif
     }
 }
+
+#if DIRECT_DISTRIBUTION && canImport(Sparkle)
+private struct UpdateControls: View {
+    @ObservedObject var updater: Updater
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Button("Check for Updates…") { updater.checkForUpdates() }
+            Toggle("Automatically check for updates", isOn: Binding(
+                get: { updater.automaticallyChecks },
+                set: { updater.automaticallyChecks = $0 }
+            ))
+            .toggleStyle(.checkbox)
+        }
+        .padding(.top, 4)
+    }
+}
+#endif
 
 /// A small drawing of the island, used in About and onboarding.
 struct IslandBadge: View {

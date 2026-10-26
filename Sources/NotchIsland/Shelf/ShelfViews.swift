@@ -1,13 +1,26 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The Shelf tab: a drop zone when empty, a row of files otherwise.
+/// The Shelf tab: the shelf on the left (70%), an AirDrop zone on the right (30%).
 struct ShelfPanel: View {
     @ObservedObject var shelf: ShelfService
     /// A file is being dragged over the island.
     let isTargeted: Bool
 
+    private let gap: CGFloat = 12
+
     var body: some View {
+        GeometryReader { geo in
+            let shelfWidth = (geo.size.width - gap) * 0.7
+            HStack(spacing: gap) {
+                shelfSide.frame(width: shelfWidth)
+                AirDropZone(shelf: shelf)
+            }
+        }
+        .onAppear { shelf.refresh() }
+    }
+
+    private var shelfSide: some View {
         Group {
             if shelf.items.isEmpty {
                 DropZone(isTargeted: isTargeted)
@@ -18,7 +31,6 @@ struct ShelfPanel: View {
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.55))
                         Spacer()
-                        ShelfButton(title: "AirDrop", symbol: "airplayaudio") { shelf.airDrop(shelf.items) }
                         ShelfButton(title: "Clear", symbol: "xmark") {
                             withAnimation(.spring(duration: 0.35, bounce: 0.2)) { shelf.clear() }
                         }
@@ -44,7 +56,56 @@ struct ShelfPanel: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.spring(duration: 0.35, bounce: 0.2), value: shelf.items)
-        .onAppear { shelf.refresh() }
+    }
+}
+
+/// Drop files here to AirDrop them straight away; click to AirDrop everything on the shelf.
+private struct AirDropZone: View {
+    @ObservedObject var shelf: ShelfService
+    @State private var isTargeted = false
+
+    var body: some View {
+        let canSendShelf = !shelf.items.isEmpty
+        ZStack {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.blue.opacity(isTargeted ? 0.3 : 0.1))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(Color.blue.opacity(isTargeted ? 0.9 : 0.35),
+                                      style: StrokeStyle(lineWidth: 1.5, dash: isTargeted ? [] : [6, 5]))
+                }
+            VStack(spacing: 6) {
+                // Like the AirDrop button in Control Center: blue rings on a white circle.
+                AirDropGlyph(lineWidth: 2.2)
+                    .foregroundStyle(.blue)
+                    .frame(width: 26, height: 26)
+                    .frame(width: 42, height: 42)
+                    .background(Circle().fill(.white))
+                    .shadow(color: .blue.opacity(isTargeted ? 0.6 : 0.25), radius: isTargeted ? 12 : 6)
+                    .scaleEffect(isTargeted ? 1.12 : 1)
+                Text("AirDrop")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(isTargeted ? "Drop to send" : canSendShelf ? "Drop files, or click to send the shelf" : "Drop files to send")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 8)
+        }
+        .scaleEffect(isTargeted ? 1.03 : 1)
+        .animation(.spring(duration: 0.3, bounce: 0.3), value: isTargeted)
+        .contentShape(Rectangle())
+        .onTapGesture { if canSendShelf { shelf.airDrop(shelf.items) } }
+        // Takes the drop before the island's own "add to shelf" drop handler does.
+        .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
+            loadFileURLs(from: providers) { urls in shelf.airDrop(urls: urls) }
+            return true
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("AirDrop")
+        .accessibilityHint(canSendShelf ? "Drop files to send them, or press to send everything on the shelf" : "Drop files to send them")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -151,4 +212,30 @@ func loadFileURLs(from providers: [NSItemProvider], completion: @escaping ([URL]
         }
     }
     group.notify(queue: .main) { completion(urls) }
+}
+
+/// The AirDrop mark: concentric rings, open at the bottom, around a center dot. Apple doesn't
+/// offer it as a public SF Symbol, so it's drawn here.
+struct AirDropGlyph: View {
+    var lineWidth: CGFloat = 2
+
+    var body: some View {
+        GeometryReader { geo in
+            let size = min(geo.size.width, geo.size.height)
+            ZStack {
+                ForEach(0..<3, id: \.self) { ring in
+                    let diameter = size * (0.4 + CGFloat(ring) * 0.3)
+                    Circle()
+                        // A gap of about 60 degrees, turned to sit at the bottom.
+                        .trim(from: 0.085, to: 0.915)
+                        .stroke(style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                        .rotationEffect(.degrees(90))
+                        .frame(width: diameter, height: diameter)
+                }
+                Circle().frame(width: size * 0.16, height: size * 0.16)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .accessibilityHidden(true)
+    }
 }
