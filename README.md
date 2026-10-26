@@ -96,3 +96,7 @@ swift scripts/make-icon.swift && iconutil -c icns build/AppIcon.iconset -o Resou
 - v1: Xcode project, sandboxed App Store build, pairing between app and extension, Chrome Web Store listing
 - v1.1: Safari extension
 - v2: on-device assistant in the island (Apple Foundation Models), App Intents for Siri and Shortcuts
+
+## License
+
+MIT. See [LICENSE](LICENSE).
