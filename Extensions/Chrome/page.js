@@ -5,11 +5,11 @@
 
   // Sites whose controls need more than the generic <video>/<audio> handling.
   const SITES = [
-    { host: /(^|\.)music\.youtube\.com$/, name: "YouTube Music", next: ".next-button", previous: ".previous-button" },
-    { host: /(^|\.)youtube\.com$/, name: "YouTube", next: ".ytp-next-button" },
+    { host: /(^|\.)music\.youtube\.com$/, name: "YouTube Music", next: ".next-button", previous: ".previous-button", music: true },
+    { host: /(^|\.)youtube\.com$/, name: "YouTube", next: ".ytp-next-button", previous: ".ytp-prev-button", historyBack: true },
     { host: /(^|\.)netflix\.com$/, name: "Netflix", canSeek: false, title: () => document.querySelector('[data-uia="video-title"]')?.innerText },
-    { host: /(^|\.)open\.spotify\.com$/, name: "Spotify", next: '[data-testid="control-button-skip-forward"]', previous: '[data-testid="control-button-skip-back"]', toggle: '[data-testid="control-button-playpause"]' },
-    { host: /(^|\.)soundcloud\.com$/, name: "SoundCloud", next: ".skipControl__next", previous: ".skipControl__previous" },
+    { host: /(^|\.)open\.spotify\.com$/, name: "Spotify", next: '[data-testid="control-button-skip-forward"]', previous: '[data-testid="control-button-skip-back"]', toggle: '[data-testid="control-button-playpause"]', music: true },
+    { host: /(^|\.)soundcloud\.com$/, name: "SoundCloud", next: ".skipControl__next", previous: ".skipControl__previous", music: true },
     { host: /(^|\.)twitch\.tv$/, name: "Twitch", canSeek: false },
     { host: /(^|\.)primevideo\.com$/, name: "Prime Video" },
     { host: /(^|\.)disneyplus\.com$/, name: "Disney+" },
@@ -151,6 +151,22 @@
     return Boolean(button);
   }
 
+  // Music sites: past the first few seconds, "previous" restarts the song, like a music app.
+  // Video sites (YouTube): it goes to the previous video, in a playlist or else by going back.
+  function previous(el) {
+    if (site.music && el && el.currentTime > 3 && site.name !== "Spotify") {
+      el.currentTime = 0;
+      return;
+    }
+    const inPlaylist = new URLSearchParams(location.search).has("list");
+    if (site.historyBack && !inPlaylist) {
+      if (history.length > 1) history.back();
+      else if (el) el.currentTime = 0;
+      return;
+    }
+    if (!runAction("previoustrack") && !click(site.previous) && el) el.currentTime = 0;
+  }
+
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.data?.__notchIsland !== "command") return;
     const el = currentMedia();
@@ -162,9 +178,7 @@
         if (!runAction("nexttrack")) click(site.next);
         break;
       case "previous":
-        // Like a music app: past the first few seconds, "previous" restarts the current item.
-        if (el && el.currentTime > 3 && site.name !== "Spotify") el.currentTime = 0;
-        else if (!runAction("previoustrack") && !click(site.previous) && el) el.currentTime = 0;
+        previous(el);
         break;
       case "seek":
         if (el && site.canSeek !== false) el.currentTime = event.data.time;
