@@ -143,7 +143,11 @@ final class CalendarService: ObservableObject {
 
     /// The first video-call link in the event's URL, location or notes.
     private static func joinURL(for event: EKEvent) -> URL? {
-        let texts = [event.url?.absoluteString, event.location, event.notes].compactMap { $0 }
+        joinURL(in: [event.url?.absoluteString, event.location, event.notes].compactMap { $0 })
+    }
+
+    /// The first link to a known video-call service in these texts.
+    static func joinURL(in texts: [String]) -> URL? {
         for text in texts {
             let matches = linkDetector?.matches(in: text, range: NSRange(text.startIndex..., in: text)) ?? []
             for match in matches {
