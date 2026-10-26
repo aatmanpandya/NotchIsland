@@ -151,8 +151,45 @@
     return Boolean(button);
   }
 
+  // YouTube has no "previous video" outside playlists, so remember the videos watched in this
+  // tab (kept in the tab's session storage, which survives YouTube's page loads).
+  const WATCHED_KEY = "__notchIslandWatched";
+  function videoID() {
+    return new URLSearchParams(location.search).get("v");
+  }
+  function watched() {
+    try {
+      return JSON.parse(sessionStorage.getItem(WATCHED_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function rememberVideo() {
+    const id = videoID();
+    if (!site.historyBack || !id) return;
+    const list = watched();
+    if (list[list.length - 1] === id) return;
+    list.push(id);
+    sessionStorage.setItem(WATCHED_KEY, JSON.stringify(list.slice(-50)));
+  }
+  window.addEventListener("yt-navigate-finish", rememberVideo);
+  setInterval(rememberVideo, 1000);
+
+  // Goes to the video watched before this one in this tab; false if there isn't one.
+  function previousVideo() {
+    const current = videoID();
+    const list = watched();
+    while (list.length && list[list.length - 1] === current) list.pop();
+    const previous = list.pop();
+    if (!previous) return false;
+    // Drop it too: it's added back once it loads, so pressing again keeps going back.
+    sessionStorage.setItem(WATCHED_KEY, JSON.stringify(list));
+    location.assign(`/watch?v=${encodeURIComponent(previous)}`);
+    return true;
+  }
+
   // Music sites: past the first few seconds, "previous" restarts the song, like a music app.
-  // Video sites (YouTube): it goes to the previous video, in a playlist or else by going back.
+  // YouTube: the previous video (in a playlist, YouTube's own previous; else the last one watched).
   function previous(el) {
     if (site.music && el && el.currentTime > 3 && site.name !== "Spotify") {
       el.currentTime = 0;
@@ -160,8 +197,7 @@
     }
     const inPlaylist = new URLSearchParams(location.search).has("list");
     if (site.historyBack && !inPlaylist) {
-      if (history.length > 1) history.back();
-      else if (el) el.currentTime = 0;
+      if (!previousVideo() && el) el.currentTime = 0;
       return;
     }
     if (!runAction("previoustrack") && !click(site.previous) && el) el.currentTime = 0;

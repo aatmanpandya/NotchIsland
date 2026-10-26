@@ -10,11 +10,18 @@ const shortName = BROWSER.replace(/^(Google|Microsoft) /, "");
 
 let socket = null;
 let retryTimer = null;
+// Retries slow down while the app isn't running (each failed attempt is logged by Chrome),
+// and reset once connected. Playback updates from a tab also reconnect right away.
+let retryDelay = 3000;
+const MAX_RETRY_DELAY = 30000;
 
 function connect() {
   if (socket && socket.readyState <= WebSocket.OPEN) return;
   socket = new WebSocket(`ws://127.0.0.1:${PORT}`);
-  socket.onopen = sync;
+  socket.onopen = () => {
+    retryDelay = 3000;
+    sync();
+  };
   socket.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data);
@@ -24,7 +31,8 @@ function connect() {
   socket.onclose = () => {
     socket = null;
     clearTimeout(retryTimer);
-    retryTimer = setTimeout(connect, 3000);
+    retryTimer = setTimeout(connect, retryDelay);
+    retryDelay = Math.min(retryDelay * 2, MAX_RETRY_DELAY);
   };
   socket.onerror = () => {};
 }
@@ -67,10 +75,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (hadMedia || hadCall) sync();
 });
 
-// Regular traffic keeps the worker alive while connected; reconnect if the app was restarted.
+// Regular traffic keeps the worker alive while connected. Reconnecting is left to the retry timer.
 setInterval(() => {
   if (socket?.readyState === WebSocket.OPEN) socket.send('{"type":"ping"}');
-  else connect();
 }, 20000);
 
 connect();
