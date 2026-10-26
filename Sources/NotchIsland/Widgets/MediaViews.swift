@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MediaPanel: View {
@@ -104,7 +105,9 @@ private struct ProgressRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.25)) { context in
+        // Once a second, as often as the times change. Each tick lays out the whole island
+        // again, so ticking 4 times a second cost about 10% CPU while it was open.
+        TimelineView(.periodic(from: .now, by: 1)) { context in
             let elapsed = now.elapsed(at: context.date)
             let fraction = now.duration > 0 ? min(1, elapsed / now.duration) : 0
             VStack(spacing: 4) {
@@ -224,17 +227,102 @@ struct AudioBars: View {
     }
 
     private var decorative: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: !isPlaying)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 2) {
-                ForEach(0..<speeds.count, id: \.self) { i in
-                    let level = isPlaying ? 0.3 + 0.7 * abs(sin(t * speeds[i] + Double(i) * 1.3)) : 0.2
-                    Capsule()
-                        .fill(LinearGradient(colors: [color, color.opacity(0.6)], startPoint: .top, endPoint: .bottom))
-                        .frame(width: height / 4.5, height: height * level)
-                }
+        let barWidth = height / 4.5
+        return DecorativeBars(isPlaying: isPlaying, color: color, speeds: speeds, barWidth: barWidth)
+            .frame(width: barWidth * CGFloat(speeds.count) + 2 * CGFloat(speeds.count - 1), height: height)
+    }
+}
+
+/// The bars' made-up motion, run by Core Animation. Driving it from SwiftUI 30 times a second
+/// laid out the whole island each frame (about 10% CPU); this way the window server animates it
+/// and the app does nothing per frame.
+private struct DecorativeBars: NSViewRepresentable {
+    let isPlaying: Bool
+    let color: Color
+    let speeds: [Double]
+    let barWidth: CGFloat
+
+    func makeNSView(context: Context) -> BarsView { BarsView() }
+
+    func updateNSView(_ view: BarsView, context: Context) {
+        view.configure(isPlaying: isPlaying, color: NSColor(color), speeds: speeds, barWidth: barWidth)
+    }
+
+    final class BarsView: NSView {
+        private var bars: [CAGradientLayer] = []
+        private var isPlaying = false
+        private var speeds: [Double] = []
+        private var barWidth: CGFloat = 3
+        private var laidOutHeight: CGFloat = 0
+
+        override init(frame: NSRect) {
+            super.init(frame: frame)
+            wantsLayer = true
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+        func configure(isPlaying: Bool, color: NSColor, speeds: [Double], barWidth: CGFloat) {
+            let restart = isPlaying != self.isPlaying || speeds != self.speeds || barWidth != self.barWidth
+            self.isPlaying = isPlaying
+            self.speeds = speeds
+            self.barWidth = barWidth
+            if bars.count != speeds.count {
+                bars.forEach { $0.removeFromSuperlayer() }
+                bars = speeds.map { _ in CAGradientLayer() }
+                bars.forEach { layer?.addSublayer($0) }
             }
-            .frame(height: height)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for bar in bars {
+                bar.colors = [color.cgColor, color.withAlphaComponent(color.alphaComponent * 0.6).cgColor]
+                // Layer space starts at the bottom, so this runs top to bottom.
+                bar.startPoint = CGPoint(x: 0.5, y: 1)
+                bar.endPoint = CGPoint(x: 0.5, y: 0)
+            }
+            CATransaction.commit()
+            if restart { laidOutHeight = 0 }
+            needsLayout = true
+        }
+
+        override func layout() {
+            super.layout()
+            let height = bounds.height
+            guard height > 0, height != laidOutHeight else { return }
+            laidOutHeight = height
+            let scale = window?.backingScaleFactor ?? 2
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for (i, bar) in bars.enumerated() {
+                bar.contentsScale = scale
+                bar.cornerRadius = barWidth / 2
+                bar.position = CGPoint(x: CGFloat(i) * (barWidth + 2) + barWidth / 2, y: height / 2)
+                bar.removeAllAnimations()
+                guard isPlaying else {
+                    bar.bounds = CGRect(x: 0, y: 0, width: barWidth, height: height * 0.2)
+                    continue
+                }
+                // One period of 0.3 + 0.7·|sin(t·speed + phase)|, sampled and looped forever.
+                let speed = speeds[i]
+                let steps = 24
+                let heights = (0...steps).map { step -> CGFloat in
+                    let t = Double(step) / Double(steps) * .pi / speed
+                    return height * CGFloat(0.3 + 0.7 * abs(sin(t * speed + Double(i) * 1.3)))
+                }
+                bar.bounds = CGRect(x: 0, y: 0, width: barWidth, height: heights[0])
+                let motion = CAKeyframeAnimation(keyPath: "bounds.size.height")
+                motion.values = heights
+                motion.duration = .pi / speed
+                motion.repeatCount = .infinity
+                motion.isRemovedOnCompletion = false
+                bar.add(motion, forKey: "level")
+            }
+            CATransaction.commit()
+        }
+
+        override func viewDidChangeBackingProperties() {
+            super.viewDidChangeBackingProperties()
+            bars.forEach { $0.contentsScale = window?.backingScaleFactor ?? 2 }
         }
     }
 }
