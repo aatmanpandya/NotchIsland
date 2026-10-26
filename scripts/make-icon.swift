@@ -1,4 +1,4 @@
-// Draws the app icon and writes Resources/AppIcon.icns.
+// Draws the app icon into Resources/Assets.xcassets/AppIcon.appiconset.
 // Run from the repository root: swift scripts/make-icon.swift
 import AppKit
 import SwiftUI
@@ -87,8 +87,7 @@ func render() throws {
     let renderer = ImageRenderer(content: Icon())
     renderer.scale = 1
     guard let image = renderer.cgImage else { fatalError("Couldn't render the icon") }
-    let folder = URL(fileURLWithPath: "build/AppIcon.iconset", isDirectory: true)
-    try? FileManager.default.removeItem(at: folder)
+    let folder = URL(fileURLWithPath: "Resources/Assets.xcassets/AppIcon.appiconset", isDirectory: true)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
     let master = NSBitmapImageRep(cgImage: image)

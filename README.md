@@ -28,25 +28,29 @@ Prototype (v0.10). Working:
 
 ## Build and run
 
-Needs macOS 14+ and the Swift toolchain (Command Line Tools are enough for the prototype).
+Needs macOS 14+ and Xcode 26 or later (for the Liquid Glass SDK). The Xcode project is generated from `project.yml` with [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`), so it isn't committed.
 
 ```bash
 ./scripts/build-app.sh
 open build/NotchIsland.app
 ```
 
-There are two editions from the same code:
+Or `xcodegen generate` and open `NotchIsland.xcodeproj` in Xcode.
 
-| Edition | Build | Media sources |
-|---|---|---|
-| Direct download (default) | `./scripts/build-app.sh` | Browser extension, Music, Spotify, plus system-wide Now Playing for every app |
-| App Store | `EDITION=appstore ./scripts/build-app.sh` | Browser extension, Music, Spotify. No private APIs |
+There are two editions from the same code, as separate Xcode targets:
 
-The direct edition's system-wide source uses the private MediaRemote framework. Since macOS 15.4 that framework only answers Apple-signed processes, so `Helpers/NowPlayingHelper` is a small library the app loads into `/usr/bin/perl`, which streams JSON lines back over a pipe. A future macOS update could close this route; the other sources keep working if it does.
+| Edition | Target / build | Bundle ID | Media sources |
+|---|---|---|---|
+| App Store | `NotchIsland` · `EDITION=appstore ./scripts/build-app.sh` | `com.aatmanpandya.NotchIsland` | Browser extension, Music, Spotify. Sandboxed, public APIs only |
+| Direct download (default) | `NotchIsland Direct` · `./scripts/build-app.sh` | `com.aatmanpandya.NotchIsland.Direct` | Also system-wide Now Playing for every app. Hardened runtime, for notarization |
 
-The first time it reads Music or Spotify, macOS asks for Automation permission.
+Each edition declares exactly what it uses in `Resources/AppStore.entitlements` and `Resources/Direct.entitlements`.
 
-Building with Xcode's toolchain (macOS 26 SDK or later) enables real Liquid Glass. To hold the island in one state for design work, launch it with a preview state: `expanded`, `upnext` (expanded with sample meetings), `charging`, `unplugged`, `full`, `low`, `nowplaying`, `call`, `meeting`, `tools`, `timer`, `timerdone`, `device`, `shelf` (sample files, not saved), `dropzone`, `volume` or `brightness`.
+The direct edition's system-wide source uses the private MediaRemote framework. Since macOS 15.4 that framework only answers Apple-signed processes, so the `NowPlayingHelper` target builds a small library that the app loads into `/usr/bin/perl`, which streams JSON lines back over a pipe. A future macOS update could close this route; the other sources keep working if it does.
+
+The first time it reads Music or Spotify, macOS asks for Automation permission. Without an Apple Development certificate, builds are signed to run locally, and macOS asks for permissions again after each rebuild; with one, the build script uses it automatically.
+
+To hold the island in one state for design work, launch it with a preview state: `expanded`, `upnext` (expanded with sample meetings), `charging`, `unplugged`, `full`, `low`, `nowplaying`, `call`, `meeting`, `tools`, `timer`, `timerdone`, `device`, `shelf` (sample files, not saved), `dropzone`, `volume` or `brightness`.
 
 ```bash
 open --env NOTCHISLAND_PREVIEW=expanded build/NotchIsland.app
@@ -70,10 +74,10 @@ Covers playback position and optimistic updates, which source the island shows, 
 
 ## App icon
 
-Drawn in code by `scripts/make-icon.swift`, which writes `Resources/AppIcon.icns`:
+Drawn in code by `scripts/make-icon.swift`, which writes the app icon asset catalog:
 
 ```bash
-swift scripts/make-icon.swift && iconutil -c icns build/AppIcon.iconset -o Resources/AppIcon.icns
+swift scripts/make-icon.swift
 ```
 
 ## Architecture
@@ -93,7 +97,7 @@ swift scripts/make-icon.swift && iconutil -c icns build/AppIcon.iconset -o Resou
 
 ## Roadmap
 
-- v1: Xcode project, sandboxed App Store build, pairing between app and extension, Chrome Web Store listing
+- v1: signing and notarization, App Store submission, Chrome Web Store listing, DMG with auto-updates
 - v1.1: Safari extension
 - v2: on-device assistant in the island (Apple Foundation Models), App Intents for Siri and Shortcuts
 

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- App Store edition: sandboxed, with only what its features need. -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- The browser extension connects to a loopback-only WebSocket. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- Album artwork from browser tabs and Spotify is downloaded. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- Up next and meeting reminders. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+	<!-- The mirror in the Tools tab. -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
+	<!-- AirPods and other device connection pop-ups. -->
+	<key>com.apple.security.device.bluetooth</key>
+	<true/>
+	<!-- Shelf: files dropped on the island, kept as bookmarks across launches. -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
+	<key>com.apple.security.files.bookmarks.app-scope</key>
+	<true/>
+	<!-- Now playing and controls for Music and Spotify, which have no other public API. -->
+	<key>com.apple.security.temporary-exception.apple-events</key>
+	<array>
+		<string>com.apple.Music</string>
+		<string>com.spotify.client</string>
+	</array>
+</dict>
+</plist>

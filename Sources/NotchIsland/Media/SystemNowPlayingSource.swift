@@ -32,7 +32,9 @@ final class SystemNowPlayingSource: MediaSource {
     private var gaveUp = false
 
     init?() {
-        guard let url = Bundle.main.url(forResource: "NowPlayingHelper", withExtension: "dylib") else { return nil }
+        let embedded = Bundle.main.privateFrameworksURL?.appendingPathComponent("NowPlayingHelper.dylib")
+        guard let url = [embedded, Bundle.main.url(forResource: "NowPlayingHelper", withExtension: "dylib")]
+            .compactMap({ $0 }).first(where: { FileManager.default.fileExists(atPath: $0.path) }) else { return nil }
         helperURL = url
         launch()
     }
