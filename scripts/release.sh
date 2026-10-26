@@ -20,7 +20,9 @@ DMG="build/NotchIsland-$VERSION.dmg"
 # The update signature, checked against SUPublicEDKey before any update is installed.
 SIGNATURE=$(.build/xcode-direct/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update "$DMG")
 
-gh release create "v$VERSION" "$DMG" --title "NotchIsland $VERSION" --generate-notes
+# A copy with a fixed name lets the README link to the latest download.
+cp "$DMG" build/NotchIsland.dmg
+gh release create "v$VERSION" "$DMG" build/NotchIsland.dmg --title "NotchIsland $VERSION" --generate-notes
 
 python3 - "$VERSION" "$BUILD" "$SIGNATURE" <<'PY'
 import sys

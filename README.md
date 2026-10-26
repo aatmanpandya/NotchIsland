@@ -2,6 +2,12 @@
 
 A Dynamic Island–style companion for the MacBook notch. Hover the notch to expand it into a live panel with media controls, the time, and battery status.
 
+<p>
+  <a href="https://github.com/aatmanpandya/NotchIsland/releases/latest/download/NotchIsland.dmg"><img alt="Download for macOS" src="https://img.shields.io/badge/Download_for_macOS-000000?style=for-the-badge&logo=apple&logoColor=white"></a>
+</p>
+
+Requires macOS 14 or later on a Mac with a notch. Updates arrive automatically.
+
 ## Status
 
 Prototype (v0.11). Working:
