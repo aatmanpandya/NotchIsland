@@ -14,6 +14,10 @@ final class BluetoothService: NSObject {
     private var connectNotification: IOBluetoothUserNotification?
     /// Registering reports devices that are already connected; those aren't news.
     private let quietUntil = Date().addingTimeInterval(3)
+    /// When each device was last announced, by address. Links that drop and come back within
+    /// `repeatWindow` aren't announced again.
+    private var lastAnnounced: [String: Date] = [:]
+    static let repeatWindow: TimeInterval = 5 * 60
 
     override init() {
         super.init()
@@ -23,11 +27,36 @@ final class BluetoothService: NSObject {
     }
 
     @objc private func deviceConnected(_ notification: IOBluetoothUserNotification, device: IOBluetoothDevice) {
-        guard Date() > quietUntil else { return }
-        let info = Device(name: device.name ?? "Bluetooth device",
-                          symbol: Self.symbol(for: device),
-                          batteryPercent: Self.batteryPercent(of: device))
+        let name = device.name ?? "Bluetooth device"
+        let address = device.addressString ?? name
+        let now = Date()
+        let announce = now > quietUntil
+            && Self.isAccessory(majorClass: device.deviceClassMajor, name: name)
+            && Self.isNews(lastAnnounced: lastAnnounced[address], now: now)
+        DiagnosticsLog.write("Bluetooth connect: \(name) (class \(device.deviceClassMajor)), \(announce ? "shown" : "skipped").")
+        guard announce else { return }
+        lastAnnounced[address] = now
+        let info = Device(name: name, symbol: Self.symbol(for: device), batteryPercent: Self.batteryPercent(of: device))
         DispatchQueue.main.async { [weak self] in self?.onConnect?(info) }
+    }
+
+    /// Only things the user connects on purpose: headphones, keyboards, mice, controllers.
+    /// iPhones, iPads and Macs keep short Bluetooth links open for Handoff, Universal Clipboard
+    /// and Instant Hotspot, connecting over and over in the background; announcing those read
+    /// like a network alert.
+    static func isAccessory(majorClass: BluetoothDeviceClassMajor, name: String) -> Bool {
+        let lowered = name.lowercased()
+        if ["iphone", "ipad", "macbook", "imac", "mac mini", "mac studio", "mac pro"].contains(where: lowered.contains) {
+            return false
+        }
+        return majorClass != UInt32(kBluetoothDeviceClassMajorPhone)
+            && majorClass != UInt32(kBluetoothDeviceClassMajorComputer)
+    }
+
+    /// A device that dropped and reconnected a moment ago isn't news.
+    static func isNews(lastAnnounced: Date?, now: Date) -> Bool {
+        guard let lastAnnounced else { return true }
+        return now.timeIntervalSince(lastAnnounced) > repeatWindow
     }
 
     private static func symbol(for device: IOBluetoothDevice) -> String {
